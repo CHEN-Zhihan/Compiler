@@ -1,4 +1,8 @@
-#include <stdio.h>
+#include <cstring>
+using std::strlen;
+#include <iostream>
+using std::cout;    using std::endl;
+using std::printf;
 #include "c6.h"
 #include "c6.tab.h"
 
@@ -9,7 +13,18 @@ int ex(nodeType *p, int blbl, int clbl) {
     if (!p) return 0;
     switch(p->type) {
         case typeCon:
-            printf("\tpush\t%d\n", p->con.value);
+            switch (p->con.type) {
+                case INT: {
+                    printf("\tpush\t%d\n", p->con.iValue);
+                    break;
+                } case CHAR: {
+                    printf("\tpush\t%c\n", p->con.cValue);
+                    break;
+                } case STR: {
+                    printf("\tpush\t%s\n", p->con.sValue);
+                    break;
+                }
+            }
             break;
         case typeOpr:
             switch(p->opr.oper) {
@@ -62,11 +77,7 @@ int ex(nodeType *p, int blbl, int clbl) {
                     break;
                 case READ:
                     printf("\tread\n");
-                    if(p->opr.op[0]->type == typeId) {
-                        printf("\tpop\t%c\n", p->opr.op[0]->id.i + 'a');
-                    } else {
-                        printf("\tpopi\t%c\n", ex(p->opr.op[0], blbl, clbl)+'a');
-                    }
+
                     break;
                 case PRINT:
                     ex(p->opr.op[0], blbl, clbl);

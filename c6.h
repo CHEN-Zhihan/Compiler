@@ -1,6 +1,3 @@
-#include <string>
-using std::string;
-
 typedef enum { typeCon, typeId, typeOpr } nodeEnum;
 
 enum constType {
@@ -15,7 +12,7 @@ struct conNodeType {
     union {
         int iValue;
         char cValue;
-        string sValue;
+        const char * sValue;
     };
 };
 
@@ -30,6 +27,7 @@ typedef struct {
     int nops;                   /* number of operands */
     struct nodeTypeTag *op[1];  /* operands (expandable) */
 } oprNodeType;
+
 
 typedef struct nodeTypeTag {
     nodeEnum type;              /* type of node */

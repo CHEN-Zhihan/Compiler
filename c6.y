@@ -1,15 +1,19 @@
 %{
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <string>
+#include <iostream>
+using std::printf;  using std::cout;
+using std::fprintf; using std::endl;
+#include <cstdlib>
+using std::malloc;
+#include <cstdarg>
+#include <cstring>
+using std::strlen;
+
 #include "c6.h"
 
-using std::string;
 /* prototypes */
 nodeType *opr(int oper, int nops, ...);
 nodeType *con(int value);
-nodeType *con(const string& value);
+nodeType *con(const char * value);
 nodeType *con(char value);
 void freeNode(nodeType *p);
 int ex(nodeType *p, int, int);
@@ -22,14 +26,16 @@ void yyerror(char *s);
 %union {
     int iValue;                 /* integer value */
     char cValue;
-    string sValue;
+    const char * sValue;
+    const char * variable;
     nodeType *nPtr;             /* node pointer */
 };
 
 %token <iValue> INTEGER
 %token <cValue> CHARACTER
 %token <sValue> STRING
-%token FOR WHILE IF PRINT READ BREAK CONTINUE OFFSET RVALUE
+%token <variable> VARIABLE
+%token FOR WHILE IF PRINT READ BREAK CONTINUE
 %nonassoc IFX
 %nonassoc ELSE
 
@@ -40,7 +46,7 @@ void yyerror(char *s);
 %left '*' '/' '%'
 %nonassoc UMINUS
 
-%type <nPtr> stmt expr stmt_list lval rval vari
+%type <nPtr> stmt expr stmt_list 
 
 %%
 
@@ -57,8 +63,6 @@ stmt:
           ';'                                 { $$ = opr(';', 2, NULL, NULL); }
         | expr ';'                            { $$ = $1; }
         | PRINT expr ';'                      { $$ = opr(PRINT, 1, $2); }
-        | READ lval ';'                       { $$ = opr(READ, 1, $2); }
-        | lval '=' expr ';'                   { $$ = opr('=', 2, $1, $3); }
         | FOR '(' stmt stmt stmt ')' stmt     { $$ = opr(FOR, 4, $3, $4, $5, $7); }
         | WHILE '(' expr ')' stmt             { $$ = opr(WHILE, 2, $3, $5); }
         | IF '(' expr ')' stmt %prec IFX      { $$ = opr(IF, 2, $3, $5); }
@@ -68,19 +72,10 @@ stmt:
         | CONTINUE                            { $$ = opr(CONTINUE, 0); }
         ;
 
-vari:
-          VARIABLE { $$ = nullptr; }
-        ;
+program:
+        function
 
-lval:
-      vari               { $$ = $1; }
-    | vari '[' expr ']'  { $$ = opr(OFFSET, 2, $1, $3); }
-    ;
 
-rval:
-      vari               { $$ = $1; }
-    | vari '[' expr ']'  { $$ = opr(RVALUE, 1, opr(OFFSET, 2, $1, $3)); }
-    ;
 
 stmt_list:
           stmt                  { $$ = $1; }
@@ -91,7 +86,6 @@ expr:
           INTEGER               { $$ = con($1); }
         | STRING                { $$ = con($1); }
         | CHARACTER             { $$ = con($1); }
-        | rval                     { $$ = $1; }
         | '-' expr %prec UMINUS { $$ = opr(UMINUS, 1, $2); }
         | expr '+' expr         { $$ = opr('+', 2, $1, $3); }
         | expr '-' expr         { $$ = opr('-', 2, $1, $3); }
@@ -137,7 +131,7 @@ nodeType *con(char value) {
     return p;
 }
 
-nodeType *con(const string & value) {
+nodeType *con(const char * value) {
     nodeType * p = prepareConstant();
     p->con.type = STR;
     p->con.sValue = value;

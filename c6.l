@@ -1,5 +1,10 @@
 %{
-#include <stdlib.h>
+#include <cstdlib>
+using std::atoi;
+#include <cstring>
+using std::strlen;
+#include <iostream>
+using std::cout;    using std::endl;
 #include "c6.h"
 #include "c6.tab.h"
 void yyerror(char *);
@@ -7,11 +12,7 @@ void yyerror(char *);
 
 %%
 
-[a-z]       {
-                yylval.sIndex = *yytext - 'a';
-                return VARIABLE;
-            }
-
+[a-zA-Z][a-zA-Z0-9_]*   {yylval.variable = strdup(yytext); return VARIABLE;}
 0           {
                 yylval.iValue = atoi(yytext);
                 return INTEGER;
@@ -25,7 +26,10 @@ void yyerror(char *);
 [-()<>=+*/;{}.%\[\]] {
                 return *yytext;
              }
-\"[^\"]*\"  {string temp = string(yytext); yylval.sValue = temp.substr(1, temp.size() - 2); return STRING;}
+\"[^\"]*\"  {
+                yylval.sValue = strdup(yytext);
+                return STRING;
+            }
 \'[^\']\'   {yylval.cValue = yytext[1]; return CHARACTER;}
 ">="        return GE;
 "<="        return LE;
@@ -35,8 +39,6 @@ void yyerror(char *);
 "while"     return WHILE;
 "if"        return IF;
 "else"      return ELSE;
-"print"     return PRINT;
-"read"      return READ;
 "&&"        return AND;
 "||"        return OR;
 "break"     return BREAK;
