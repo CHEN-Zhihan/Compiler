@@ -1,9 +1,23 @@
+#include <string>
+using std::string;
+
 typedef enum { typeCon, typeId, typeOpr } nodeEnum;
 
+enum constType {
+    STR,
+    CHAR,
+    INT
+};
+
 /* constants */
-typedef struct {
-    int value;                  /* value of constant */
-} conNodeType;
+struct conNodeType {
+    constType type;
+    union {
+        int iValue;
+        char cValue;
+        string sValue;
+    };
+};
 
 /* identifiers */
 typedef struct {
@@ -29,4 +43,3 @@ typedef struct nodeTypeTag {
     };
 } nodeType;
 
-extern int sym[26];

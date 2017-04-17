@@ -2,30 +2,33 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <string>
 #include "c6.h"
 
-
+using std::string;
 /* prototypes */
 nodeType *opr(int oper, int nops, ...);
-nodeType *id(int i);
 nodeType *con(int value);
+nodeType *con(const string& value);
+nodeType *con(char value);
 void freeNode(nodeType *p);
 int ex(nodeType *p, int, int);
 void eop();
 int yylex(void);
 
 void yyerror(char *s);
-int sym[26];                    /* symbol table */
 %}
 
 %union {
     int iValue;                 /* integer value */
-    char sIndex;                /* symbol table index */
+    char cValue;
+    string sValue;
     nodeType *nPtr;             /* node pointer */
 };
 
 %token <iValue> INTEGER
-%token <sIndex> VARIABLE
+%token <cValue> CHARACTER
+%token <sValue> STRING
 %token FOR WHILE IF PRINT READ BREAK CONTINUE OFFSET RVALUE
 %nonassoc IFX
 %nonassoc ELSE
@@ -66,7 +69,7 @@ stmt:
         ;
 
 vari:
-          VARIABLE { $$ = id($1); }
+          VARIABLE { $$ = nullptr; }
         ;
 
 lval:
@@ -86,6 +89,8 @@ stmt_list:
 
 expr:
           INTEGER               { $$ = con($1); }
+        | STRING                { $$ = con($1); }
+        | CHARACTER             { $$ = con($1); }
         | rval                     { $$ = $1; }
         | '-' expr %prec UMINUS { $$ = opr(UMINUS, 1, $2); }
         | expr '+' expr         { $$ = opr('+', 2, $1, $3); }
@@ -108,35 +113,34 @@ expr:
 
 #define SIZEOF_NODETYPE ((char *)&p->con - (char *)p)
 
-nodeType *con(int value) {
-    nodeType *p;
-    size_t nodeSize;
-
-    /* allocate node */
-    nodeSize = SIZEOF_NODETYPE + sizeof(conNodeType);
-    if ((p = (nodeType*)malloc(nodeSize)) == NULL)
-        yyerror("out of memory");
-
-    /* copy information */
+nodeType * prepareConstant() {
+    nodeType * p;
+    size_t nodeSize = SIZEOF_NODETYPE + sizeof(conNodeType);
+    if ((p = (nodeType*)malloc(nodeSize)) == nullptr) {
+        yyerror("out of memory!");
+    }
     p->type = typeCon;
-    p->con.value = value;
-
     return p;
 }
 
-nodeType *id(int i) {
-    nodeType *p;
-    size_t nodeSize;
+nodeType *con(int value) {
+    nodeType * p = prepareConstant();
+    p->con.type = INT;
+    p->con.iValue = value;
+    return p;
+}
 
-    /* allocate node */
-    nodeSize = SIZEOF_NODETYPE + sizeof(idNodeType);
-    if ((p = (nodeType*)malloc(nodeSize)) == NULL)
-        yyerror("out of memory");
+nodeType *con(char value) {
+    nodeType * p = prepareConstant();
+    p->con.type = CHAR;
+    p->con.cValue = value;
+    return p;
+}
 
-    /* copy information */
-    p->type = typeId;
-    p->id.i = i;
-
+nodeType *con(const string & value) {
+    nodeType * p = prepareConstant();
+    p->con.type = STR;
+    p->con.sValue = value;
     return p;
 }
 

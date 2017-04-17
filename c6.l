@@ -25,7 +25,8 @@ void yyerror(char *);
 [-()<>=+*/;{}.%\[\]] {
                 return *yytext;
              }
-
+\"[^\"]*\"  {string temp = string(yytext); yylval.sValue = temp.substr(1, temp.size() - 2); return STRING;}
+\'[^\']\'   {yylval.cValue = yytext[1]; return CHARACTER;}
 ">="        return GE;
 "<="        return LE;
 "=="        return EQ;
