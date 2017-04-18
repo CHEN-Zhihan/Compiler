@@ -3,8 +3,10 @@
 using std::atoi;
 #include <cstring>
 using std::strlen;
-#include <iostream>
-using std::cout;    using std::endl;
+#include <string>
+using std::string;  using std::tolower;
+#include <algorithm>
+using std::transform;
 #include "c6.h"
 #include "c6.tab.h"
 void yyerror(char *);
@@ -12,7 +14,18 @@ void yyerror(char *);
 
 %%
 
-[a-zA-Z][a-zA-Z0-9_]*   {yylval.variable = strdup(yytext); return VARIABLE;}
+[a-zA-Z][a-zA-Z0-9]*    {
+                            string temp = string(yytext);
+                            char buffer[80];
+                            if (temp.size() > 12) {
+                                sprintf(buffer, "Variable length exceeds 12: %s", yytext);
+                                yyerror(buffer);
+                                exit(0)
+                            }
+                            transform(temp.begin(), temp.end(), temp.begin(), [](char i) -> char {return tolower(i);});
+                            yylval.variable = strdup(yytext);
+                            return VARIABLE;
+                        }
 0           {
                 yylval.iValue = atoi(yytext);
                 return INTEGER;
@@ -23,7 +36,7 @@ void yyerror(char *);
                 return INTEGER;
             }
 
-[-()<>=+*/;{}.%\[\]] {
+[-()<>=+*/;{}.%\[\]@] {
                 return *yytext;
              }
 \"[^\"]*\"  {

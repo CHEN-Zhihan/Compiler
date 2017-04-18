@@ -18,7 +18,7 @@ struct conNodeType {
 
 /* identifiers */
 typedef struct {
-    int i;                      /* subscript to sym array */
+    int i;                      /* subscript to fp */
 } idNodeType;
 
 /* operators */

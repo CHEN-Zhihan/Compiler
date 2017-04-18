@@ -7,6 +7,10 @@ using std::malloc;
 #include <cstdarg>
 #include <cstring>
 using std::strlen;
+#include <string>
+using std::string;
+#include <map>
+using std::map;
 
 #include "c6.h"
 
@@ -21,6 +25,8 @@ void eop();
 int yylex(void);
 
 void yyerror(char *s);
+static int variableCounter = 0;
+map<string, int> variableMap;
 %}
 
 %union {
@@ -46,8 +52,7 @@ void yyerror(char *s);
 %left '*' '/' '%'
 %nonassoc UMINUS
 
-%type <nPtr> stmt expr stmt_list 
-
+%type <nPtr> stmt expr stmt_list lval rval variable
 %%
 
 program:
@@ -63,6 +68,7 @@ stmt:
           ';'                                 { $$ = opr(';', 2, NULL, NULL); }
         | expr ';'                            { $$ = $1; }
         | PRINT expr ';'                      { $$ = opr(PRINT, 1, $2); }
+        | lval '=' rval ';'                   { $$ = opr('=', 2, $1, $3);}
         | FOR '(' stmt stmt stmt ')' stmt     { $$ = opr(FOR, 4, $3, $4, $5, $7); }
         | WHILE '(' expr ')' stmt             { $$ = opr(WHILE, 2, $3, $5); }
         | IF '(' expr ')' stmt %prec IFX      { $$ = opr(IF, 2, $3, $5); }
@@ -72,10 +78,19 @@ stmt:
         | CONTINUE                            { $$ = opr(CONTINUE, 0); }
         ;
 
-program:
-        function
+variable:VARIABLE               { $$ = id($1);}
+    ;
 
+rval:
+    variable                    { $$ = $1;}
+    | STRING                    { $$ = $1;}
+    | INT                       { $$ = $1;}
+    | CHAR                      { $$ = $1;}
+    ;
 
+lval:
+    variable                    { $$ = $1;}
+    ;
 
 stmt_list:
           stmt                  { $$ = $1; }
@@ -86,6 +101,7 @@ expr:
           INTEGER               { $$ = con($1); }
         | STRING                { $$ = con($1); }
         | CHARACTER             { $$ = con($1); }
+        | rval                  { $$ = $1;}
         | '-' expr %prec UMINUS { $$ = opr(UMINUS, 1, $2); }
         | expr '+' expr         { $$ = opr('+', 2, $1, $3); }
         | expr '-' expr         { $$ = opr('-', 2, $1, $3); }
@@ -161,6 +177,18 @@ nodeType *opr(int oper, int nops, ...) {
     return p;
 }
 
+nodeType *id(const char * name) {
+    int index = variableMap[string(name)] = variableCounter++;
+    nodeType * p;
+    size_t nodeSize = SIZEOF_NODETYPE + sizeof(idNodeType);
+    if ((p = (nodeType*)malloc(nodeSize)) == NULL) {
+        yyerror("out of memory!");
+    }
+    p->type = typeId;
+    p->id.i = index;
+    return p;
+}
+
 void freeNode(nodeType *p) {
     int i;
 
@@ -168,6 +196,9 @@ void freeNode(nodeType *p) {
     if (p->type == typeOpr) {
         for (i = 0; i < p->opr.nops; i++)
             freeNode(p->opr.op[i]);
+    }
+    if (p->type == typeCon and p->con.type == STR) {
+        free(p->con.sValue);
     }
     free (p);
 }
