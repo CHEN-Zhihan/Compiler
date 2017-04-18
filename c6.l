@@ -16,11 +16,29 @@ void yyerror(char *);
 
 [a-zA-Z][a-zA-Z0-9]*    {
                             string temp = string(yytext);
+                            if (temp == "for") {
+                                return FOR;
+                            }
+                            if (temp == "while") {
+                                return WHILE;
+                            }
+                            if (temp == "if") {
+                                return IF;
+                            }
+                            if (temp == "else") {
+                                return ELSE;
+                            }
+                            if (temp == "break") {
+                                return BREAK;
+                            }
+                            if (temp == "continue") {
+                                return CONTINUE;
+                            }
                             char buffer[80];
                             if (temp.size() > 12) {
                                 sprintf(buffer, "Variable length exceeds 12: %s", yytext);
                                 yyerror(buffer);
-                                exit(0)
+                                exit(0);
                             }
                             transform(temp.begin(), temp.end(), temp.begin(), [](char i) -> char {return tolower(i);});
                             yylval.variable = strdup(yytext);
@@ -48,15 +66,9 @@ void yyerror(char *);
 "<="        return LE;
 "=="        return EQ;
 "!="        return NE;
-"for"       return FOR;
-"while"     return WHILE;
-"if"        return IF;
-"else"      return ELSE;
 "&&"        return AND;
 "||"        return OR;
-"break"     return BREAK;
-"continue"  return CONTINUE;
-
+"def "      return DEF;
 \/\/.*\n    ;    /* skip comments */
 
 [ \t\n]+    ;       /* ignore whitespace */

@@ -9,7 +9,6 @@ using std::printf;
 static int lbl;
 int ex(nodeType *p, int blbl, int clbl) {
     int lblx, lbly, lblz;
-
     if (!p) return 0;
     switch(p->type) {
         case typeCon:

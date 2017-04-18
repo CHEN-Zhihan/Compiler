@@ -1,4 +1,6 @@
 %{
+#include <list>
+using std::list;
 #include <iostream>
 using std::printf;  using std::cout;
 using std::fprintf; using std::endl;
@@ -12,6 +14,7 @@ using std::string;
 #include <map>
 using std::map;
 
+
 #include "c6.h"
 
 /* prototypes */
@@ -19,6 +22,12 @@ nodeType *opr(int oper, int nops, ...);
 nodeType *con(int value);
 nodeType *con(const char * value);
 nodeType *con(char value);
+nodeType *id(const char *);
+nodeType *append(nodeType *, nodeType *);
+nodeType *func(const char *, list<string> *, nodeType *);
+list<string> * buildList();
+list<string> * buildList(const char *);
+list<string> * buildList(const char *, list<string> *);
 void freeNode(nodeType *p);
 int ex(nodeType *p, int, int);
 void eop();
@@ -35,13 +44,14 @@ map<string, int> variableMap;
     const char * sValue;
     const char * variable;
     nodeType *nPtr;             /* node pointer */
+    std::list<string> * parameterPointer;
 };
 
 %token <iValue> INTEGER
 %token <cValue> CHARACTER
 %token <sValue> STRING
 %token <variable> VARIABLE
-%token FOR WHILE IF PRINT READ BREAK CONTINUE
+%token FOR WHILE IF PRINT READ BREAK CONTINUE DEF
 %nonassoc IFX
 %nonassoc ELSE
 
@@ -52,17 +62,32 @@ map<string, int> variableMap;
 %left '*' '/' '%'
 %nonassoc UMINUS
 
-%type <nPtr> stmt expr stmt_list lval rval variable
+%type <nPtr> stmt expr stmt_list lval rval variable definitionList function definition
+%type <parameterPointer> parameterList
 %%
 
 program:
-        function                { eop(); exit(0); }
+        definitionList                          { eop(); exit(0); }
+        | 
+
+definitionList:
+        definition                          { $$ = $1;}
+        | definition definitionList        { $$ = append($1, $2);}
+
+definition:
+        lval '=' rval ';'                   { $$ = opr('=', 2, $1, $3);}
+        | function                          { $$ = $1;}
         ;
 
-function:
-          function stmt         { ex($2,998,998); freeNode($2); }
-        | /* NULL */
+parameterList:
+        VARIABLE                            { $$ = buildList($1);}
+        | VARIABLE ',' parameterList        { $$ = buildList($1, $3);}
+        |                                   { $$ = buildList();}
         ;
+function:
+        DEF VARIABLE '(' parameterList ')' '{' stmt_list '}'    { $$ = func($2, $4, $7);}
+        ;
+
 
 stmt:
           ';'                                 { $$ = opr(';', 2, NULL, NULL); }
@@ -83,9 +108,6 @@ variable:VARIABLE               { $$ = id($1);}
 
 rval:
     variable                    { $$ = $1;}
-    | STRING                    { $$ = $1;}
-    | INT                       { $$ = $1;}
-    | CHAR                      { $$ = $1;}
     ;
 
 lval:
@@ -177,6 +199,27 @@ nodeType *opr(int oper, int nops, ...) {
     return p;
 }
 
+nodeType * append(nodeType * head, nodeType * list) {
+    return head;
+}
+
+list<string> * buildList() {
+    return new list<string>();
+}
+
+list<string> * buildList(const char * parameter) {
+    return new list<string>{string(parameter)};
+}
+
+list<string> * buildList(const char * parameter, list<string> * l) {
+    l->push_front(string(parameter));
+    return l;
+}
+
+nodeType *func(const char * name, list<string> *parameters, nodeType *stmts) {
+    return stmts;
+}
+
 nodeType *id(const char * name) {
     int index = variableMap[string(name)] = variableCounter++;
     nodeType * p;
@@ -198,7 +241,7 @@ void freeNode(nodeType *p) {
             freeNode(p->opr.op[i]);
     }
     if (p->type == typeCon and p->con.type == STR) {
-        free(p->con.sValue);
+        free((char*)p->con.sValue);
     }
     free (p);
 }
@@ -208,7 +251,7 @@ void yyerror(char *s) {
 }
 
 int main(int argc, char **argv) {
-extern FILE* yyin;
+    extern FILE* yyin;
     yyin = fopen(argv[1], "r");
     yyparse();
     return 0;
