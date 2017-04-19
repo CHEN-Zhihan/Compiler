@@ -1,5 +1,16 @@
-typedef enum { typeCon, typeId, typeOpr } nodeEnum;
+#include <list>
+using std::list;
 
+enum nodeEnum{ typeCon, typeId, typeOpr, typeFunc };
+
+enum idType {
+    STR,
+    CHAR,
+    INT,
+    FUNC
+};
+
+struct nodeType;
 enum constType {
     STR,
     CHAR,
@@ -17,19 +28,30 @@ struct conNodeType {
 };
 
 /* identifiers */
-typedef struct {
-    int i;                      /* subscript to fp */
-} idNodeType;
+struct idNodeType{
+    int i;                      /* variable identifier */
+    bool global;
+    idType type;
+};
+
+struct funcNodeType {
+    int i;
+    list<nodeType *> * parameters;
+    list<nodeType *> * arguments;
+    int argumentNumber;
+
+};
 
 /* operators */
-typedef struct {
+struct oprNodeType {
     int oper;                   /* operator */
     int nops;                   /* number of operands */
-    struct nodeTypeTag *op[1];  /* operands (expandable) */
-} oprNodeType;
+    idType resultType;
+    nodeType *op[1];  /* operands (expandable) */
+};
 
 
-typedef struct nodeTypeTag {
+struct nodeType {
     nodeEnum type;              /* type of node */
 
     /* union must be last entry in nodeType */
@@ -37,7 +59,8 @@ typedef struct nodeTypeTag {
     union {
         conNodeType con;        /* constants */
         idNodeType id;          /* identifiers */
+        funcNodeType func;      /* functions */        
         oprNodeType opr;        /* operators */
     };
-} nodeType;
+};
 

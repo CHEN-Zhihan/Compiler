@@ -1,6 +1,6 @@
 	push	"what a gg"
 	push	'g'
-	push	fp[0]
+	push	sb[0]
 	puts
 	jmp	L999
 L998:

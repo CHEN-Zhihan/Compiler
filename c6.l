@@ -7,11 +7,15 @@ using std::strlen;
 using std::string;  using std::tolower;
 #include <algorithm>
 using std::transform;
+#include <list>
+using std::list;
+#include <iostream>
+using std::cout;    using std::endl;
 #include "c6.h"
 #include "c6.tab.h"
 void yyerror(char *);
 %}
-
+%option yylineno
 %%
 
 [a-zA-Z][a-zA-Z0-9]*    {
@@ -46,15 +50,17 @@ void yyerror(char *);
                         }
 0           {
                 yylval.iValue = atoi(yytext);
+                cout << yylval.iValue << endl;
                 return INTEGER;
             }
 
 [1-9][0-9]* {
                 yylval.iValue = atoi(yytext);
+                cout << yylval.iValue << endl;                
                 return INTEGER;
             }
 
-[-()<>=+*/;{}.%\[\]@] {
+[-()<>=+*/;{}.%\[\]@,] {
                 return *yytext;
              }
 \"[^\"]*\"  {
@@ -73,10 +79,15 @@ void yyerror(char *);
 
 [ \t\n]+    ;       /* ignore whitespace */
 
-.           yyerror("Unknown character");
-
+.           yyerror(yytext);
+<<EOF>>     return END;
 %%
 
 int yywrap(void) {
     return 1;
+}
+
+void yyerror(char *s) {
+    fprintf(stderr, "%d: %s at %s\n", yylineno, s, yytext);
+    exit(-1);
 }

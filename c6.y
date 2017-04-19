@@ -1,19 +1,24 @@
 %{
 #include <list>
 using std::list;
+
 #include <iostream>
 using std::printf;  using std::cout;
 using std::fprintf; using std::endl;
+using std::cerr;
+
 #include <cstdlib>
 using std::malloc;
+
 #include <cstdarg>
 #include <cstring>
 using std::strlen;
+
 #include <string>
 using std::string;
+
 #include <map>
 using std::map;
-
 
 #include "c6.h"
 
@@ -22,12 +27,16 @@ nodeType *opr(int oper, int nops, ...);
 nodeType *con(int value);
 nodeType *con(const char * value);
 nodeType *con(char value);
-nodeType *id(const char *);
+nodeType *id(const char *, bool isGlobal=false);
 nodeType *append(nodeType *, nodeType *);
-nodeType *func(const char *, list<string> *, nodeType *);
-list<string> * buildList();
-list<string> * buildList(const char *);
-list<string> * buildList(const char *, list<string> *);
+nodeType *call(const char *, list<nodeType *> *);
+nodeType *func(nodeType *, list<nodeType*> *, nodeType *);
+list<nodeType*> * buildParList();
+list<nodeType*> * buildParList(nodeType*);
+list<nodeType*> * buildParList(nodeType*, list<nodeType *> *);
+list<nodeType *> * buildArgList();
+list<nodeType *> * buildArgList(nodeType *);
+list<nodeType *> * buildArgList(nodeType *, list<nodeType *> *);
 void freeNode(nodeType *p);
 int ex(nodeType *p, int, int);
 void eop();
@@ -35,23 +44,24 @@ int yylex(void);
 
 void yyerror(char *s);
 static int variableCounter = 0;
-map<string, int> variableMap;
+map<string, nodeType*> variableMap;
+map<string, nodeType*> functionMap;
 %}
-
+%debug
 %union {
     int iValue;                 /* integer value */
     char cValue;
     const char * sValue;
     const char * variable;
     nodeType *nPtr;             /* node pointer */
-    std::list<string> * parameterPointer;
+    list<nodeType *> *arguments;
 };
 
 %token <iValue> INTEGER
 %token <cValue> CHARACTER
 %token <sValue> STRING
 %token <variable> VARIABLE
-%token FOR WHILE IF PRINT READ BREAK CONTINUE DEF
+%token FOR WHILE IF PRINT READ BREAK CONTINUE DEF END
 %nonassoc IFX
 %nonassoc ELSE
 
@@ -62,68 +72,89 @@ map<string, int> variableMap;
 %left '*' '/' '%'
 %nonassoc UMINUS
 
-%type <nPtr> stmt expr stmt_list lval rval variable definitionList function definition
-%type <parameterPointer> parameterList
+%type <nPtr> stmt expr stmt_list variable definitionList function definition
+%type <arguments> argumentList parameterList
 %%
 
 program:
-        definitionList                          { eop(); exit(0); }
-        | 
+        definitionList END                          {eop(); exit(0); }
+        ;
 
 definitionList:
-        definition                          { $$ = $1;}
-        | definition definitionList        { $$ = append($1, $2);}
-
+        definition                          { $$ = $1; cout << "definitionList -> definition" << endl;}
+        | definitionList definition         { $$ = append($1, $2); cout << "definitionList -> definition definitionList" << endl;}
+        ;
 definition:
-        lval '=' rval ';'                   { $$ = opr('=', 2, $1, $3);}
-        | function                          { $$ = $1;}
+        VARIABLE '=' outExpr ';'                   { $$ = define(); cout << "definition -> =" << endl;}
+        | function                          { $$ = $1; cout << "definition -> function" << endl;}
         ;
 
 parameterList:
-        VARIABLE                            { $$ = buildList($1);}
-        | VARIABLE ',' parameterList        { $$ = buildList($1, $3);}
-        |                                   { $$ = buildList();}
+        variable                            { $$ = buildParList($1);}
+        | variable ',' parameterList        { $$ = buildParList($1, $3);}
+        |                                   { $$ = buildParList();}
         ;
 function:
-        DEF VARIABLE '(' parameterList ')' '{' stmt_list '}'    { $$ = func($2, $4, $7);}
+        DEF variable '(' parameterList ')' '{' stmt_list '}'    { $$ = func($2, $4, $7); cout << "function -> DEF" << endl;}
         ;
 
+argumentList:
+        expr                                  { $$ = buildArgList($1);}
+        | expr ',' argumentList               { $$ = buildArgList($1, $3);}
+        |                                     { $$ = buildArgList();}
+        ;
 
 stmt:
           ';'                                 { $$ = opr(';', 2, NULL, NULL); }
-        | expr ';'                            { $$ = $1; }
+        | expr ';'                            { $$ = $1; cout << "stmt -> expr" << endl;}
         | PRINT expr ';'                      { $$ = opr(PRINT, 1, $2); }
-        | lval '=' rval ';'                   { $$ = opr('=', 2, $1, $3);}
+        | variable '=' expr ';'                   { $$ = opr('=', 2, $1, $3); cout << "stmt -> =" << endl;}
         | FOR '(' stmt stmt stmt ')' stmt     { $$ = opr(FOR, 4, $3, $4, $5, $7); }
         | WHILE '(' expr ')' stmt             { $$ = opr(WHILE, 2, $3, $5); }
-        | IF '(' expr ')' stmt %prec IFX      { $$ = opr(IF, 2, $3, $5); }
-        | IF '(' expr ')' stmt ELSE stmt      { $$ = opr(IF, 3, $3, $5, $7); }
+        | IF '(' expr ')' stmt %prec IFX      {  cout << "stmt -> IF" << endl; $$ = opr(IF, 2, $3, $5);}
+        | IF '(' expr ')' stmt ELSE stmt      { $$ = opr(IF, 3, $3, $5, $7); cout << "stmt -> IF ELSE" << endl;}
         | '{' stmt_list '}'                   { $$ = $2; }
         | BREAK                               { $$ = opr(BREAK, 0); }
         | CONTINUE                            { $$ = opr(CONTINUE, 0); }
         ;
 
-variable:VARIABLE               { $$ = id($1);}
-    ;
-
-rval:
-    variable                    { $$ = $1;}
-    ;
-
-lval:
-    variable                    { $$ = $1;}
-    ;
+variable:
+        VARIABLE                { $$ = id($1);}
+        | '@' VARIABLE          { $$ = id($1, true)}
 
 stmt_list:
-          stmt                  { $$ = $1; }
-        | stmt_list stmt        { $$ = opr(';', 2, $1, $2); }
+          stmt                  { $$ = $1; cout << "stmt_list -> stmt" << endl;}
+        | stmt_list stmt        { $$ = opr(';', 2, $1, $2); cout << "stmt_list -> stmt_list stmt" << endl;}
+        ;
+
+outExpr:
+          INTEGER               { $$ = con($1); cout << "outExpr -> INTEGER" << endl;}
+        | STRING                { $$ = con($1); }
+        | CHARACTER             { $$ = con($1); }
+        | variable                  { $$ = $1;cout << "outExpr -> variable" << endl;}
+        | '-' outExpr %prec UMINUS { $$ = opr(UMINUS, 1, $2); }
+        | outExpr '+' outExpr         { $$ = opr('+', 2, $1, $3); }
+        | outExpr '-' outExpr         { $$ = opr('-', 2, $1, $3); }
+        | outExpr '*' outExpr         { $$ = opr('*', 2, $1, $3); }
+        | outExpr '%' outExpr         { $$ = opr('%', 2, $1, $3); }
+        | outExpr '/' outExpr         { $$ = opr('/', 2, $1, $3); }
+        | outExpr '<' outExpr         { $$ = opr('<', 2, $1, $3); }
+        | outExpr '>' outExpr         { $$ = opr('>', 2, $1, $3); }
+        | outExpr GE outExpr          { $$ = opr(GE, 2, $1, $3); }
+        | outExpr LE outExpr          { $$ = opr(LE, 2, $1, $3); }
+        | outExpr NE outExpr          { $$ = opr(NE, 2, $1, $3); }
+        | outExpr EQ outExpr          { $$ = opr(EQ, 2, $1, $3); }
+        | outExpr AND outExpr            { $$ = opr(AND, 2, $1, $3); }
+        | outExpr OR outExpr            { $$ = opr(OR, 2, $1, $3); }
+        | '(' outExpr ')'          { $$ = $2; }
+        | VARIABLE '(' argumentList ')' {$$ = call($1, $3);}
         ;
 
 expr:
-          INTEGER               { $$ = con($1); }
+          INTEGER               { $$ = con($1); cout << "expr -> INTEGER" << endl;}
         | STRING                { $$ = con($1); }
         | CHARACTER             { $$ = con($1); }
-        | rval                  { $$ = $1;}
+        | variable                  { $$ = $1;cout << "expr -> variable" << endl;}
         | '-' expr %prec UMINUS { $$ = opr(UMINUS, 1, $2); }
         | expr '+' expr         { $$ = opr('+', 2, $1, $3); }
         | expr '-' expr         { $$ = opr('-', 2, $1, $3); }
@@ -139,8 +170,8 @@ expr:
         | expr AND expr            { $$ = opr(AND, 2, $1, $3); }
         | expr OR expr            { $$ = opr(OR, 2, $1, $3); }
         | '(' expr ')'          { $$ = $2; }
+        | VARIABLE '(' argumentList ')' {$$ = call($1, $3);}
         ;
-
 %%
 
 #define SIZEOF_NODETYPE ((char *)&p->con - (char *)p)
@@ -149,11 +180,13 @@ nodeType * prepareConstant() {
     nodeType * p;
     size_t nodeSize = SIZEOF_NODETYPE + sizeof(conNodeType);
     if ((p = (nodeType*)malloc(nodeSize)) == nullptr) {
-        yyerror("out of memory!");
+        cerr << "out of memory!" << endl;;
     }
     p->type = typeCon;
     return p;
 }
+
+nodeType * define(nodeType * )
 
 nodeType *con(int value) {
     nodeType * p = prepareConstant();
@@ -186,7 +219,7 @@ nodeType *opr(int oper, int nops, ...) {
     nodeSize = SIZEOF_NODETYPE + sizeof(oprNodeType) +
         (nops - 1) * sizeof(nodeType*);
     if ((p = (nodeType*)malloc(nodeSize)) == NULL)
-        yyerror("out of memory");
+        cerr << "out of memory" << endl;
 
     /* copy information */
     p->type = typeOpr;
@@ -199,36 +232,49 @@ nodeType *opr(int oper, int nops, ...) {
     return p;
 }
 
-nodeType * append(nodeType * head, nodeType * list) {
+nodeType * append(nodeType * list, nodeType * head) {
     return head;
 }
 
-list<string> * buildList() {
-    return new list<string>();
+list<nodeType *> * buildParList() {
+    return new list<nodeType *>();
 }
 
-list<string> * buildList(const char * parameter) {
-    return new list<string>{string(parameter)};
+list<nodeType *> * buildParList(nodeType * parameter) {
+    return new list<nodeType *>{parameter};
 }
 
-list<string> * buildList(const char * parameter, list<string> * l) {
-    l->push_front(string(parameter));
+list<nodeType *> * buildParList(nodeType * parameter, list<nodeType*> * l) {
+    l->push_front(parameter);
     return l;
 }
 
-nodeType *func(const char * name, list<string> *parameters, nodeType *stmts) {
+list<nodeType *> * buildArgList() {
+    auto p = new list<nodeType*>();
+    return p;
+}
+
+list<nodeType *> * buildArgList(nodeType * p) {
+    return new list<nodeType*>{p};
+}
+list<nodeType *> * buildArgList(nodeType *n , list<nodeType *> *l) {
+    l->push_front(n);
+    return l;
+}
+
+nodeType *func(nodeType * name, list<nodeType*> *parameters, nodeType *stmts) {
     return stmts;
 }
 
-nodeType *id(const char * name) {
-    int index = variableMap[string(name)] = variableCounter++;
+nodeType *id(const char * name, bool isGlobal) {
     nodeType * p;
     size_t nodeSize = SIZEOF_NODETYPE + sizeof(idNodeType);
     if ((p = (nodeType*)malloc(nodeSize)) == NULL) {
-        yyerror("out of memory!");
+        cerr << "out of memory!" << endl;;
     }
     p->type = typeId;
-    p->id.i = index;
+    p->id.i = variableCounter++;
+    p->id.global = isGlobal;
     return p;
 }
 
@@ -246,11 +292,22 @@ void freeNode(nodeType *p) {
     free (p);
 }
 
-void yyerror(char *s) {
-    fprintf(stdout, "%s\n", s);
+nodeType *call(const char * function, list<nodeType *> * arguments) {
+    if (functionMap.count(string(function)) == 0) {
+        cerr << "Reference to undefined function: " << string(function) << endl;
+    }
+
+    return arguments->front();
+}
+
+
+void init() {
+    ;
 }
 
 int main(int argc, char **argv) {
+    yydebug = 1;
+    init();
     extern FILE* yyin;
     yyin = fopen(argv[1], "r");
     yyparse();

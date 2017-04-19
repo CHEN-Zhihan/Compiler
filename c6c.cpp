@@ -3,10 +3,17 @@ using std::strlen;
 #include <iostream>
 using std::cout;    using std::endl;
 using std::printf;
+#include <string>
+using std::string;
+#include <list>
+using std::list;
 #include "c6.h"
 #include "c6.tab.h"
 
 static int lbl;
+static int sb;
+static int fp;
+
 int ex(nodeType *p, int blbl, int clbl) {
     int lblx, lbly, lblz;
     if (!p) return 0;
@@ -25,8 +32,19 @@ int ex(nodeType *p, int blbl, int clbl) {
                 }
             }
             break;
+        case typeId: {
+            if (p->id.global) {
+                printf("\tpush\tsb[%d]\n", p->id.i);
+            } else {
+                printf("\tpush\tfp[%d]\n", p->id.i);
+            }
+        }
         case typeOpr:
             switch(p->opr.oper) {
+                case DEFINE: {
+                    ex(p->opr.op[1], blbl, clbl);
+                    p->opr.op[0].i = sb++;
+                }
                 case BREAK:
                     printf("\tjmp\tL%03d\n", blbl);
                     break;
