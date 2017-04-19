@@ -12,7 +12,7 @@ using std::list;
 #include <iostream>
 using std::cout;    using std::endl;
 #include "c6.h"
-#include "c6.tab.h"
+#include "parser.tab.h"
 void yyerror(char *);
 %}
 %option yylineno

@@ -2,17 +2,66 @@
 using std::strlen;
 #include <iostream>
 using std::cout;    using std::endl;
-using std::printf;
+using std::printf;  using std::cerr;
 #include <string>
 using std::string;
 #include <list>
 using std::list;
+
+#include <vector>
+using std::vector;
+
+#include <map>
+using std::map;
+
 #include "c6.h"
-#include "c6.tab.h"
+#include "parser.tab.h"
 
 static int lbl;
 static int sb;
-static int fp;
+static int fb;
+static int sp;
+
+#define TOP(v) v[v.size() - 1]
+
+int ex(nodeType *, int, int);
+vector<map<string, int> > variableStack;
+map<string, int> functionMap;
+vector<nodeType *> functionTable;
+
+
+void run(list<nodeType *>* l) {
+    list<nodeType *> definitionList;
+    list<nodeType *> functionList;
+    for (auto i: *l) {
+        if (i->type == typeOpr) {
+            definitionList.push_front(i);
+        } else {
+            functionList.push_front(i);
+        }
+    }
+    map<string, int> global;
+    for (auto i:definitionList) {
+        ex(i->opr.op[1], 998, 998);
+        global[*i->opr.op[0]->id.name] = sb++;
+        ++sp;
+    }
+    variableStack.push_back(global);
+    fb = sb + 1;
+    nodeType * entry = nullptr;
+    for (auto i:functionList) {
+        if (*i->func.name == "main" and (i->func.parameters->size() == 0)) {
+            entry = i->func.stmts;
+        }
+    }
+    if (entry == nullptr) {
+        cerr << "main() function not found" << endl;
+        exit(-1);
+    }
+    variableStack.push_back(map<string, int>());
+    ex(entry, 998, 998);
+}
+
 
 int ex(nodeType *p, int blbl, int clbl) {
     int lblx, lbly, lblz;
@@ -33,18 +82,24 @@ int ex(nodeType *p, int blbl, int clbl) {
             }
             break;
         case typeId: {
+            string name = *(p->id.name);
             if (p->id.global) {
-                printf("\tpush\tsb[%d]\n", p->id.i);
+                if (variableStack[0].count(name) == 0) {
+                    cerr << "Undefined reference to global variable: " << name << endl;
+                    exit(-1);
+                }
+                printf("\tpush\tsb[%d]\n", variableStack[0][name]);
             } else {
-                printf("\tpush\tfp[%d]\n", p->id.i);
+                if (TOP(variableStack).count(name) == 0) {
+                    cerr << "Undefined reference to variable: " << name << endl;
+                    exit(-1);
+                }
+                printf("\tpush\tfp[%d]\n", TOP(variableStack)[name]);
             }
+            break;
         }
         case typeOpr:
             switch(p->opr.oper) {
-                case DEFINE: {
-                    ex(p->opr.op[1], blbl, clbl);
-                    p->opr.op[0].i = sb++;
-                }
                 case BREAK:
                     printf("\tjmp\tL%03d\n", blbl);
                     break;
@@ -92,22 +147,25 @@ int ex(nodeType *p, int blbl, int clbl) {
                         printf("L%03d:\n", lblx);
                     }
                     break;
-                case READ:
-                    printf("\tread\n");
-
-                    break;
-                case PRINT:
-                    ex(p->opr.op[0], blbl, clbl);
-                    printf("\tprint\n");
-                    break;
-                case '=':
+                case '=': {
                     ex(p->opr.op[1], blbl, clbl);
-                    if(p->opr.op[0]->type == typeId) {
-                        printf("\tpop\t%c\n", p->opr.op[0]->id.i + 'a');
+                    string name = *(p->opr.op[0]->id.name);
+                    if (p->opr.op[0]->id.global) {
+                        if (variableStack[0].count(name) == 0) {
+                            cerr << "Reference to undefined global variable: " << name << endl;
+                            exit(-1);
+                        }
+                        printf("\tpop\tsb[%d]\n", variableStack[0][name]);
                     } else {
-                        printf("\tpopi\t%c\n", ex(p->opr.op[0], blbl, clbl)+'a');
+                        if (TOP(variableStack).count(name) == 0) {
+                            TOP(variableStack)[name] = TOP(variableStack).size() - 1;
+                        } else {
+                            printf("\tpop\tfb[%d]\n", TOP(variableStack)[name]);
+                        }
                     }
                     break;
+                }
+                
                 case UMINUS:
                     ex(p->opr.op[0], blbl, clbl);
                     printf("\tneg\n");

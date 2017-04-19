@@ -1,13 +1,20 @@
+#ifndef C6_H
+#define C6_H
+
 #include <list>
 using std::list;
 
+#include <string>
+using std::string;
+
 enum nodeEnum{ typeCon, typeId, typeOpr, typeFunc };
 
+
 enum idType {
-    STR,
-    CHAR,
-    INT,
-    FUNC
+    str,
+    character,
+    integer,
+    function
 };
 
 struct nodeType;
@@ -29,17 +36,15 @@ struct conNodeType {
 
 /* identifiers */
 struct idNodeType{
-    int i;                      /* variable identifier */
+    string * name;                      /* variable identifier */
     bool global;
     idType type;
 };
 
 struct funcNodeType {
-    int i;
+    string * name;
     list<nodeType *> * parameters;
-    list<nodeType *> * arguments;
-    int argumentNumber;
-
+    nodeType * stmts;
 };
 
 /* operators */
@@ -64,3 +69,4 @@ struct nodeType {
     };
 };
 
+#endif // C6_H
