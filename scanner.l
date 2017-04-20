@@ -18,7 +18,7 @@ void yyerror(char *);
 %option yylineno
 %%
 
-[a-zA-Z][a-zA-Z0-9]*    {
+[a-zA-Z][a-zA-Z0-9_]*    {
                             string temp = string(yytext);
                             if (temp == "for") {
                                 return FOR;

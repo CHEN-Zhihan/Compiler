@@ -12,7 +12,10 @@ using std::list;
 using std::vector;
 
 #include <map>
-using std::map;
+using std::map; using std::pair;
+
+#include <set>
+using std::set;
 
 #include "c6.h"
 #include "parser.tab.h"
@@ -25,10 +28,12 @@ static int sp;
 #define TOP(v) v[v.size() - 1]
 
 extern vector<string> reverseLookup;
-vector<map<int, int> > variableStack;
-map<int, int> functionMap;
-vector<nodeType *> functionTable;
-
+static set<int> comparator;
+static map<int, string> reverseSymbolLookup;
+static vector<map<int, pair<int, valueEnum> > > variableStack;
+static vector<map<int, int> > functionStack;
+static map<int, set<pair<int, int> > > appliable;
+static vector<string> valueName;
 void variableCheck(int i, bool global) {
     if (global) {
         if (variableStack[0].count(i) == 0) {
@@ -47,19 +52,40 @@ void variableCheck(int i, bool global) {
     }
 }
 
-
+void assign(idNodeType& id, valueEnum type) {
+    int i = id.i;
+    if (id.global) {
+        if (variableStack[0].count(i) == 0) {
+            cerr << "Reference to undefined global variable: " << reverseLookup[i] << endl;
+            exit(-1);
+        }
+        variableStack[0][i].second = type;
+        printf("\tpop\tsb[%d]\n", variableStack[0][i].first);
+    } else {
+        if (TOP(variableStack).count(i) == 0) {
+            TOP(variableStack)[i] = pair<int, int>{TOP(variableStack).size() - 1, type};
+        } else {
+            TOP(variableStack)[i].second = type;
+            if (variableStack.size() == 1) {
+                printf("\tpop\tsb[%d]\n", variableStack[0][i].first);
+            } else {
+                printf("\tpop\tfb[%d]\n", TOP(variableStack)[i].first);
+            }
+        }
+    }
+}
 
 int ex(nodeType *p, int blbl, int clbl) {
     int lblx, lbly, lblz;
     if (!p) return 0;
     switch(p->type) {
         case typeCon:
-            switch (p->con.type) {
+            switch (p->valueType) {
                 case INT: {
                     printf("\tpush\t%d\n", p->con.iValue);
                     break;
                 } case CHAR: {
-                    printf("\tpush\t%c\n", p->con.cValue);
+                    printf("\tpush\t'%c'\n", p->con.cValue);
                     break;
                 } case STR: {
                     printf("\tpush\t%s\n", p->con.sValue);
@@ -71,14 +97,32 @@ int ex(nodeType *p, int blbl, int clbl) {
             int i = p->id.i;
             variableCheck(i, p->id.global);
             if (p->id.global or variableStack.size() == 1) {
-                printf("\tpush\tsb[%d]\n", variableStack[0][i]);
+                p->valueType = variableStack[0][i].second;
+                printf("\tpush\tsb[%d]\n", variableStack[0][i].first);
             } else {
-                printf("\tpush\tfp[%d]\n", TOP(variableStack)[i]);
+                p->valueType = TOP(variableStack)[i].second;
+                printf("\tpush\tfp[%d]\n", TOP(variableStack)[i].first);
             }
             break;
         }
         case typeFunc: {
-            ;
+            break;
+        }
+        case typeCall: {
+            callNodeType& call = p->call;
+            if (call.i < 9) {
+                auto argument = call.arguments->front();                
+                if (call.i < 3) {
+                    cout << "\t" << reverseLookup[call.i] << "\n";
+                    assign(argument->id);
+                } else {
+                    ex(argument, blbl, clbl);
+                    cout << "\t" << reverseLookup[call.i] << "\n";
+                }
+            } else {
+                ;
+            }
+            break;
         }
         case typeOpr:
             switch(p->opr.oper) {
@@ -131,27 +175,9 @@ int ex(nodeType *p, int blbl, int clbl) {
                     break;
                 case '=': {
                     ex(p->opr.op[1], blbl, clbl);
-                    int i = p->opr.op[0]->id.i;
-                    if (p->opr.op[0]->id.global) {
-                        if (variableStack[0].count(i) == 0) {
-                            cerr << "Reference to undefined global variable: " << reverseLookup[i] << endl;
-                            exit(-1);
-                        }
-                        printf("\tpop\tsb[%d]\n", variableStack[0][i]);
-                    } else {
-                        if (TOP(variableStack).count(i) == 0) {
-                            TOP(variableStack)[i] = TOP(variableStack).size() - 1;
-                        } else {
-                            if (variableStack.size() == 1) {
-                                printf("\tpop\tsb[%d]\n", variableStack[0][i]);
-                            } else {
-                                printf("\tpop\tfb[%d]\n", TOP(variableStack)[i]);
-                            }
-                        }
-                    }
+                    assign(p->opr.op[0]->id);
                     break;
                 }
-                
                 case UMINUS:
                     ex(p->opr.op[0], blbl, clbl);
                     printf("\tneg\n");
@@ -194,6 +220,25 @@ void eop() {
 }
 
 void run(nodeType *p) {
-    variableStack.push_back(map<int, int>{});
+    variableStack.push_back(map<int, pair<int, valueEnum>>{});
+    reverseSymbolLookup = map<int, string>{{'+', "+"}, {'-', "-"}, {'*', "*"},
+                                            {'/', "/"}, {'%', "%"}, {'<', "<"}, {'>', ">"}, {GE, ">="}, {LE, "<="},
+                                            {EQ, "=="}, {NE, "!="}, {AND, "&&"}, {OR, "||"}};
+    valueName = vector<string>{"string", "character", "integer", "function"};
+    appliable['+'] = set<pair<int, int> >{{INT, INT}, {INT, CHAR}, {CHAR, INT}};
+    appliable['-'] = set<pair<int, int> >{{INT, INT}, {INT, CHAR}, {CHAR, INT}};
+    appliable['*'] = set<pair<int, int> >{{INT, INT}};
+    appliable['/'] = appliable['*'];
+    appliable['%'] = appliable['*'];
+    appliable[GE] = set<pair<int, int> >{{CHAR, CHAR}, {INT, INT}};
+    appliable[LE] = appliable[GE];
+    appliable['>'] = appliable[GE];
+    appliable['<'] = appliable[GE];
+    appliable[EQ] = appliable[GE];
+    appliable[EQ].insert(pair<int, int>{BOOL, BOOL});
+    appliable[NE] = appliable[EQ];
+    appliable[AND] = set<pair<int, int> >{{BOOL, BOOL}};
+    appliable[OR] = appliable[AND];
+    comparator = set<int>{GE, LE, '<', '>', NE, EQ};
     ex(p, 998, 998);
 }

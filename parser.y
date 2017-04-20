@@ -54,9 +54,8 @@ int yylex(void);
 void yyerror(char *s);
 static map<string, int> variableMap;
 vector<string> reverseLookup;
+set<int> functionSet;
 static int variableCounter;
-static map<string, nodeType *> functionMap;
-static int functionCounter;
 %}
 %debug
 %union {
@@ -153,9 +152,7 @@ expr:
 %%
 
 #define SIZEOF_NODETYPE ((char *)&p->con - (char *)p)
-static map<int, string> opers{{'+', "+"}, {'-', "-"}, {'*', "*"}, {'/', "/"}, 
-                                    {'%', "%"}, {'<', "<"}, {'>', ">"}, {GE, ">="}, {NE, "!="}, {LE, "<="}, {EQ, "=="}};
-static map<int, string> consts{{INT, "integer"}, {CHAR, "character"}, {STR, "string"}};
+
 nodeType * prepareConstant() {
     nodeType * p;
     size_t nodeSize = SIZEOF_NODETYPE + sizeof(conNodeType);
@@ -170,31 +167,25 @@ nodeType * prepareConstant() {
 
 nodeType *con(int value) {
     nodeType * p = prepareConstant();
-    p->con.type = INT;
+    p->valueType = INT;
     p->con.iValue = value;
     return p;
 }
 
 nodeType *con(char value) {
     nodeType * p = prepareConstant();
-    p->con.type = CHAR;
+    p->valueType = CHAR;
     p->con.cValue = value;
     return p;
 }
 
 nodeType *con(const char * value) {
     nodeType * p = prepareConstant();
-    p->con.type = STR;
+    p->valueType = STR;
     p->con.sValue = value;
     return p;
 }
-constType getType(const nodeType * n) {
-    if (n->type == typeCon) {
-        return n->con.type;
-    } else {
-        return INT;
-    }
-}
+
 nodeType *opr(int oper, int nops, ...) {
     va_list ap;
     nodeType *p;
@@ -214,13 +205,25 @@ nodeType *opr(int oper, int nops, ...) {
     for (i = 0; i < nops; i++)
         p->opr.op[i] = va_arg(ap, nodeType*);
     va_end(ap);
-    if (opers.count(oper) != 0) {
-        auto left = getType(p->opr.op[0]);
-        auto right = getType(p->opr.op[1]);
-        if (left != right) {
-            cerr << "Invalid operation: " << opers[oper] << " between " << consts[left] << " and " << consts[right] << endl;
+    if (appliable.count(oper) > 0) {
+        int typeLeft = p->opr.op[0].valueType;
+        int typeRight = p->opr.op[1].valueType;
+        if (appliable[oper].count(pair<int, int>{typeLeft, typeRight}) == 0) {
+            cerr << "Invalid operation: " << reverseSymbolLookup[oper] << " on "
+                 << valueName[typeLeft] << " and " << valueName[typeRight] << endl;
             exit(-1);
         }
+        if (comparator.count(oper) != 0) {
+            p->valueType = BOOL;
+        } else {
+            if (typeLeft == CHAR or typeRight == CHAR) {
+                p->valueType == CHAR;
+            } else {
+                p->valueType = typeLeft;
+            }
+        }
+    } else if (oper == '=') {
+        p->opr.op[0].valueType = p->opr.op[1].valueType;
     }
     return p;
 }
@@ -268,15 +271,16 @@ nodeType *func(const char * name, list<nodeType*> *parameters, nodeType *stmts) 
     }
     p->type = typeFunc;
     p->func.parameters = parameters;
-    p->func.arguments = new list<nodeType *>();
     p->func.stmts = stmts;
     string n = string(name);
-    if (functionMap.count(n) != 0) {
+    if (variableMap.count(n) != 0) {
         cerr << "Redefinition of function: " << n << endl;
         exit(-1);
     }
-    p->func.i = functionCounter++;
-    functionMap[n] = p;
+    p->func.i = variableCounter++;
+    variableMap[n] = p->func.i;
+    reverseLookup.push_back(n);
+    functionSet.insert(p->func.i);
     return p;
 }
 
@@ -286,13 +290,21 @@ nodeType *id(const char * name, bool isGlobal) {
     if ((p = (nodeType*)malloc(nodeSize)) == NULL) {
         cerr << "out of memory!" << endl;;
     }
+    if (string(name) == "c") {
+        ;
+    }
     p->type = typeId;
     string n = string(name);
     if (variableMap.count(n) == 0) {
-        variableMap[n] = variableCounter++;
+        p->id.i = variableCounter++;
+        variableMap[n] = p->id.i;
         reverseLookup.push_back(n);
+    } else if (functionSet.count(variableMap[n]) != 0) {
+        cerr << "Cannot assign value to function: " << n << endl;
+        exit(-1);
+    } else {
+        p->id.i = variableMap[n];
     }
-    p->id.i = variableMap[n];
     p->id.global = isGlobal;
     return p;
 }
@@ -305,37 +317,56 @@ void freeNode(nodeType *p) {
         for (i = 0; i < p->opr.nops; i++)
             freeNode(p->opr.op[i]);
     }
-    if (p->type == typeCon and p->con.type == STR) {
+    if (p->type == typeCon and p->valueType == STR) {
         free((char*)p->con.sValue);
     }
     free (p);
 }
 
-nodeType *call(const char * function, list<nodeType *> * arguments) {
-    auto p = pair<string, int>{string(function), arguments->size()};
-    string name = string(function);
-    if (functionMap.count(name) == 0) {
-        
-    }
-    nodeType* candidate = functionMap[name];
-    int expect = candidate->func.parameters->size() - candidate->func.arguments->size();
-    if (expect < arguments->size()) {
-        cerr << "Call to function: " << name << " with incorrect parameter numbers (expected: " 
-        << expect << ", actual: " << arguments->size() << endl;
+nodeType *call(const char * name, list<nodeType *> * arguments) {
+    string n = string(name);
+    if (variableMap.count(n) == 0) {
+        cerr << "Call on undefined function: " << n << endl;
         exit(-1);
-    } else if (expect == arguments->size()) {
-        for (const auto &j:arguments) {
-            candidate->func.arguments.push_back(j);
-        }
-        nodeType * p = 
     }
+    int index = variableMap[n];
+    bool invalid = arguments->size() == 0;
+    if (index < 9) {
+        if (index < 3 and not invalid) {
+            for (const auto & i: *arguments) {
+                if (i->type != typeId) {
+                    invalid = true;
+                    break;
+                }
+            }
+        }
+        if (invalid) {
+            cerr << "Invalid call on function: " << n << endl;
+            exit(-1);
+        }
+    }
+    nodeType * p;
+    if ((p = (nodeType*)malloc(SIZEOF_NODETYPE + sizeof(callNodeType))) == nullptr) {
+        cerr << "out of memory" << endl;
+    }
+    p->type = typeCall;
+    p->call.i = index;
+    p->call.arguments = arguments;
+    return p;
+}
 
-    return arguments->front();
+void init() {
+    for (auto & i: {"geti", "getc", "gets", "puti", "puti_", "putc", "putc_", "puts", "gets_"}) {
+        variableMap[i] = variableCounter ++;
+        functionSet.insert(variableCounter - 1);
+        reverseLookup.push_back(i);
+    }
 }
 
 int main(int argc, const char *argv[]) {
     yydebug = 0;
     extern FILE* yyin;
+    init();
     yyin = fopen(argv[1], "r");
     yyparse();
     return 0;

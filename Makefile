@@ -1,6 +1,9 @@
-c6: scanner.cpp parser.tab.c cvm
+c6: scanner.cpp parser.tab.c compiler.cpp cvm
 	g++ scanner.cpp parser.tab.c compiler.cpp -o c6 -std=c++11 -g
-	rm scanner.cpp parser.tab.h parser.tab.c
+
+run:c6
+	./c6 test.hc > test.as
+	./cvm test.as
 
 scanner.cpp: scanner.l
 	flex  -o scanner.cpp scanner.l

@@ -10,23 +10,19 @@ using std::string;
 enum nodeEnum{ typeCon, typeId, typeOpr, typeFunc, typeCall };
 
 
-enum idType {
-    str,
-    character,
-    integer,
-    function
+enum valueEnum {
+    STR,
+    CHAR,
+    INT,
+    BOOL,
+    FUNC
 };
 
 struct nodeType;
-enum constType {
-    STR,
-    CHAR,
-    INT
-};
+
 
 /* constants */
 struct conNodeType {
-    constType type;
     union {
         int iValue;
         char cValue;
@@ -39,32 +35,30 @@ struct conNodeType {
 struct idNodeType{
     int i;                      /* variable identifier */
     bool global;
-    idType type;
 };
 
 struct funcNodeType {
     int i;
     list<nodeType *> * parameters;
-    list<nodeType *> * arguments;
     nodeType * stmts;
 };
 
 struct callNodeType {
-    
-}
+    int i;
+    list<nodeType *> * arguments;
+};
 
 /* operators */
 struct oprNodeType {
     int oper;                   /* operator */
     int nops;                   /* number of operands */
-    idType resultType;
     nodeType *op[1];  /* operands (expandable) */
 };
 
 
 struct nodeType {
     nodeEnum type;              /* type of node */
-
+    valueEnum valueType;
     /* union must be last entry in nodeType */
     /* because operNodeType may dynamically increase */
     union {
