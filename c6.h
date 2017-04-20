@@ -7,7 +7,7 @@ using std::list;
 #include <string>
 using std::string;
 
-enum nodeEnum{ typeCon, typeId, typeOpr, typeFunc };
+enum nodeEnum{ typeCon, typeId, typeOpr, typeFunc, typeCall };
 
 
 enum idType {
@@ -34,18 +34,24 @@ struct conNodeType {
     };
 };
 
+
 /* identifiers */
 struct idNodeType{
-    string * name;                      /* variable identifier */
+    int i;                      /* variable identifier */
     bool global;
     idType type;
 };
 
 struct funcNodeType {
-    string * name;
+    int i;
     list<nodeType *> * parameters;
+    list<nodeType *> * arguments;
     nodeType * stmts;
 };
+
+struct callNodeType {
+    
+}
 
 /* operators */
 struct oprNodeType {
@@ -66,6 +72,7 @@ struct nodeType {
         idNodeType id;          /* identifiers */
         funcNodeType func;      /* functions */        
         oprNodeType opr;        /* operators */
+        callNodeType call;      
     };
 };
 

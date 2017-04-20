@@ -18,10 +18,13 @@ using std::strlen;
 using std::string;
 
 #include <map>
-using std::map;
+using std::map; using std::pair;
 
 #include <vector>
 using std::vector;
+
+#include <set>
+using std::set;
 
 #include "c6.h"
 
@@ -46,10 +49,14 @@ list<nodeType *> * buildArgList(nodeType *, list<nodeType *> *);
 void freeNode(nodeType *p);
 int ex(nodeType *p, int, int);
 void eop();
-void run(list<nodeType*>* p);
+void run(nodeType* p);
 int yylex(void);
 void yyerror(char *s);
-
+static map<string, int> variableMap;
+vector<string> reverseLookup;
+static int variableCounter;
+static map<string, nodeType *> functionMap;
+static int functionCounter;
 %}
 %debug
 %union {
@@ -76,30 +83,18 @@ void yyerror(char *s);
 %left '*' '/' '%'
 %nonassoc UMINUS
 
-%type <nPtr> stmt expr stmt_list variable function definition constant
-%type <arguments> argumentList parameterList definitionList
+%type <nPtr> stmt expr stmt_list variable constant
+%type <arguments> argumentList parameterList
 %%
 
 program:
-        definitionList END                          {run($1); exit(0); }
-        ;
-
-definitionList:
-        definition                          { $$ = append($1);}
-        | definitionList definition         {$$ = append($1, $2);}
-        ;
-definition:
-        variable '=' constant ';'           { $$ = opr('=', 2, $1, $3); }
-        | function                          { $$ = $1;}
+        stmt_list END                          {run($1); exit(0); }
         ;
 
 parameterList:
         variable                            { $$ = buildParList($1);}
         | variable ',' parameterList        { $$ = buildParList($1, $3);}
         |                                   { $$ = buildParList();}
-        ;
-function:
-        DEF VARIABLE '(' parameterList ')' '{' stmt_list '}'    { $$ = func($2, $4, $7);}
         ;
 
 argumentList:
@@ -111,15 +106,15 @@ argumentList:
 stmt:
           ';'                                 { $$ = opr(';', 2, NULL, NULL); }
         | expr ';'                            { $$ = $1;}
-        | PRINT expr ';'                      { $$ = opr(PRINT, 1, $2); }
         | variable '=' expr ';'                   { $$ = opr('=', 2, $1, $3);}
-        | FOR '(' stmt stmt stmt ')' stmt     { $$ = opr(FOR, 4, $3, $4, $5, $7); }
-        | WHILE '(' expr ')' stmt             { $$ = opr(WHILE, 2, $3, $5); }
+        | FOR '(' stmt stmt stmt ')' stmt     { $$ = opr(FOR, 4, $3, $4, $5, $7);}
+        | WHILE '(' expr ')' stmt             { $$ = opr(WHILE, 2, $3, $5);}
         | IF '(' expr ')' stmt %prec IFX      {  $$ = opr(IF, 2, $3, $5);}
-        | IF '(' expr ')' stmt ELSE stmt      { $$ = opr(IF, 3, $3, $5, $7); }
-        | '{' stmt_list '}'                   { $$ = $2; }
-        | BREAK                               { $$ = opr(BREAK, 0); }
-        | CONTINUE                            { $$ = opr(CONTINUE, 0); }
+        | IF '(' expr ')' stmt ELSE stmt      { $$ = opr(IF, 3, $3, $5, $7);}
+        | '{' stmt_list '}'                   { $$ = $2;}
+        | BREAK                               { $$ = opr(BREAK, 0);}
+        | CONTINUE                            { $$ = opr(CONTINUE, 0);}
+        | DEF VARIABLE '(' parameterList ')' '{' stmt_list '}'    { $$ = func($2, $4, $7);}
         ;
 
 constant:
@@ -133,7 +128,7 @@ variable:
 
 stmt_list:
           stmt                  { $$ = $1;}
-        | stmt_list stmt        { $$ = opr(';', 2, $1, $2); }
+        | stmt_list stmt        { $$ = opr(';', 2, $1, $2);}
         ;
 expr:
         constant                   {$$ = $1;}
@@ -205,7 +200,6 @@ nodeType *opr(int oper, int nops, ...) {
     nodeType *p;
     size_t nodeSize;
     int i;
-
     /* allocate node */
     nodeSize = SIZEOF_NODETYPE + sizeof(oprNodeType) +
         (nops - 1) * sizeof(nodeType*);
@@ -227,9 +221,7 @@ nodeType *opr(int oper, int nops, ...) {
             cerr << "Invalid operation: " << opers[oper] << " between " << consts[left] << " and " << consts[right] << endl;
             exit(-1);
         }
-
     }
-
     return p;
 }
 
@@ -276,8 +268,15 @@ nodeType *func(const char * name, list<nodeType*> *parameters, nodeType *stmts) 
     }
     p->type = typeFunc;
     p->func.parameters = parameters;
+    p->func.arguments = new list<nodeType *>();
     p->func.stmts = stmts;
-    p->func.name = new string(name);
+    string n = string(name);
+    if (functionMap.count(n) != 0) {
+        cerr << "Redefinition of function: " << n << endl;
+        exit(-1);
+    }
+    p->func.i = functionCounter++;
+    functionMap[n] = p;
     return p;
 }
 
@@ -288,7 +287,12 @@ nodeType *id(const char * name, bool isGlobal) {
         cerr << "out of memory!" << endl;;
     }
     p->type = typeId;
-    p->id.name = new string(name);
+    string n = string(name);
+    if (variableMap.count(n) == 0) {
+        variableMap[n] = variableCounter++;
+        reverseLookup.push_back(n);
+    }
+    p->id.i = variableMap[n];
     p->id.global = isGlobal;
     return p;
 }
@@ -308,18 +312,29 @@ void freeNode(nodeType *p) {
 }
 
 nodeType *call(const char * function, list<nodeType *> * arguments) {
+    auto p = pair<string, int>{string(function), arguments->size()};
+    string name = string(function);
+    if (functionMap.count(name) == 0) {
+        
+    }
+    nodeType* candidate = functionMap[name];
+    int expect = candidate->func.parameters->size() - candidate->func.arguments->size();
+    if (expect < arguments->size()) {
+        cerr << "Call to function: " << name << " with incorrect parameter numbers (expected: " 
+        << expect << ", actual: " << arguments->size() << endl;
+        exit(-1);
+    } else if (expect == arguments->size()) {
+        for (const auto &j:arguments) {
+            candidate->func.arguments.push_back(j);
+        }
+        nodeType * p = 
+    }
 
     return arguments->front();
 }
 
-
-void init() {
-    ;
-}
-
 int main(int argc, const char *argv[]) {
     yydebug = 0;
-    init();
     extern FILE* yyin;
     yyin = fopen(argv[1], "r");
     yyparse();

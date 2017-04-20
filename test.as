@@ -1,8 +1,12 @@
-	push	"what a gg"
-	push	'g'
-	push	sb[0]
-	puts
-	jmp	L999
-L998:
-	push	999999
-L999:
+	push	"gg"
+	push	1
+	push	sb[1]
+	push	1
+	add
+	pop	sb[1]
+	push	sb[1]
+	push	2
+	compEQ
+	j0	L000
+	push	3
+L000:
