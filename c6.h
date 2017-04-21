@@ -11,6 +11,7 @@ enum nodeEnum{ typeCon, typeId, typeOpr, typeFunc, typeCall };
 
 
 enum valueEnum {
+    NONE,
     STR,
     CHAR,
     INT,

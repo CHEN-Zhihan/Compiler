@@ -205,26 +205,6 @@ nodeType *opr(int oper, int nops, ...) {
     for (i = 0; i < nops; i++)
         p->opr.op[i] = va_arg(ap, nodeType*);
     va_end(ap);
-    if (appliable.count(oper) > 0) {
-        int typeLeft = p->opr.op[0].valueType;
-        int typeRight = p->opr.op[1].valueType;
-        if (appliable[oper].count(pair<int, int>{typeLeft, typeRight}) == 0) {
-            cerr << "Invalid operation: " << reverseSymbolLookup[oper] << " on "
-                 << valueName[typeLeft] << " and " << valueName[typeRight] << endl;
-            exit(-1);
-        }
-        if (comparator.count(oper) != 0) {
-            p->valueType = BOOL;
-        } else {
-            if (typeLeft == CHAR or typeRight == CHAR) {
-                p->valueType == CHAR;
-            } else {
-                p->valueType = typeLeft;
-            }
-        }
-    } else if (oper == '=') {
-        p->opr.op[0].valueType = p->opr.op[1].valueType;
-    }
     return p;
 }
 
@@ -330,21 +310,6 @@ nodeType *call(const char * name, list<nodeType *> * arguments) {
         exit(-1);
     }
     int index = variableMap[n];
-    bool invalid = arguments->size() == 0;
-    if (index < 9) {
-        if (index < 3 and not invalid) {
-            for (const auto & i: *arguments) {
-                if (i->type != typeId) {
-                    invalid = true;
-                    break;
-                }
-            }
-        }
-        if (invalid) {
-            cerr << "Invalid call on function: " << n << endl;
-            exit(-1);
-        }
-    }
     nodeType * p;
     if ((p = (nodeType*)malloc(SIZEOF_NODETYPE + sizeof(callNodeType))) == nullptr) {
         cerr << "out of memory" << endl;
@@ -356,7 +321,7 @@ nodeType *call(const char * name, list<nodeType *> * arguments) {
 }
 
 void init() {
-    for (auto & i: {"geti", "getc", "gets", "puti", "puti_", "putc", "putc_", "puts", "gets_"}) {
+    for (auto & i: {"gets", "getc", "geti", "puts", "putc", "puti", "gets_", "putc_", "puti_"}) {
         variableMap[i] = variableCounter ++;
         functionSet.insert(variableCounter - 1);
         reverseLookup.push_back(i);

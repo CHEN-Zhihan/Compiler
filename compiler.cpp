@@ -32,8 +32,9 @@ static set<int> comparator;
 static map<int, string> reverseSymbolLookup;
 static vector<map<int, pair<int, valueEnum> > > variableStack;
 static vector<map<int, int> > functionStack;
-static map<int, set<pair<int, int> > > appliable;
-static vector<string> valueName;
+static map<int, set<pair<valueEnum, valueEnum> > > applicable;
+static vector<string> reverseTypeLookup;
+static vector<valueEnum> requiredType;
 void variableCheck(int i, bool global) {
     if (global) {
         if (variableStack[0].count(i) == 0) {
@@ -52,8 +53,43 @@ void variableCheck(int i, bool global) {
     }
 }
 
+void typeCheck(const nodeType * p, const callNodeType & c) {
+    if (c.i >= 3 and c.i < 9 and p->valueType != requiredType[c.i]) {
+        cerr << "Invalid call to function: " << reverseLookup[c.i]
+            << " expect type: " << reverseTypeLookup[requiredType[c.i]]
+            << " actual type: " << reverseTypeLookup[p->valueType] << endl;
+        exit(-1);
+    }
+}
+
+void conditionCheck(const nodeType * p) {
+    if (p->valueType == NONE) {
+        cerr << "Invalid type of condition: None" << endl;
+        exit(-1);
+    }
+}
+
+void typeCheck(const oprNodeType &p) {
+    if (p.nops == 1 and p.op[0]->valueType != INT) {
+        cerr << "Invalid use of -" << " expected type: integer, actual type: " << reverseTypeLookup[p.op[0]->valueType] << endl;
+        exit(-1);
+    } else if (p.nops == 2 and applicable.count(p.oper) > 0){
+        valueEnum left = p.op[0]->valueType;
+        valueEnum right = p.op[1]->valueType;
+        if (applicable[p.oper].count(pair<valueEnum, valueEnum>{left, right}) == 0) {
+            cerr << "Invalid use of " << reverseSymbolLookup[p.oper] << " on "
+                << reverseTypeLookup[p.op[0]->valueType] << " and " << reverseTypeLookup[p.op[1]->valueType] << endl;
+            exit(-1);
+        }
+    }
+}
+
 void assign(idNodeType& id, valueEnum type) {
     int i = id.i;
+    if (type == NONE) {
+        cerr << "Assigning None to variable: " << reverseLookup[i] << endl;
+        exit(-1);
+    }
     if (id.global) {
         if (variableStack[0].count(i) == 0) {
             cerr << "Reference to undefined global variable: " << reverseLookup[i] << endl;
@@ -63,7 +99,8 @@ void assign(idNodeType& id, valueEnum type) {
         printf("\tpop\tsb[%d]\n", variableStack[0][i].first);
     } else {
         if (TOP(variableStack).count(i) == 0) {
-            TOP(variableStack)[i] = pair<int, int>{TOP(variableStack).size() - 1, type};
+            int size = TOP(variableStack).size();
+            TOP(variableStack)[i] = pair<int, valueEnum>{size, type};
         } else {
             TOP(variableStack)[i].second = type;
             if (variableStack.size() == 1) {
@@ -113,10 +150,15 @@ int ex(nodeType *p, int blbl, int clbl) {
             if (call.i < 9) {
                 auto argument = call.arguments->front();                
                 if (call.i < 3) {
+                    if (argument->type != typeId) {
+                        cerr << "Invalid call to " << reverseLookup[call.i] << endl;
+                        exit(-1); 
+                    }
                     cout << "\t" << reverseLookup[call.i] << "\n";
-                    assign(argument->id);
+                    assign(argument->id, requiredType[call.i]);
                 } else {
                     ex(argument, blbl, clbl);
+                    typeCheck(argument, call);
                     cout << "\t" << reverseLookup[call.i] << "\n";
                 }
             } else {
@@ -151,6 +193,7 @@ int ex(nodeType *p, int blbl, int clbl) {
                     lbly = lbl++;
                     printf("L%03d:\n", lblx);
                     ex(p->opr.op[0], blbl, clbl);
+                    conditionCheck(p->opr.op[0]);
                     printf("\tj0\tL%03d\n", lbly);
                     ex(p->opr.op[1], lbly, lblx);
                     printf("\tjmp\tL%03d\n", lblx);
@@ -158,6 +201,7 @@ int ex(nodeType *p, int blbl, int clbl) {
                     break;
                 case IF:
                     ex(p->opr.op[0], blbl, clbl);
+                    conditionCheck(p->opr.op[0]);
                     if (p->opr.nops > 2) {
                         /* if else */
                         printf("\tj0\tL%03d\n", lblx = lbl++);
@@ -175,16 +219,31 @@ int ex(nodeType *p, int blbl, int clbl) {
                     break;
                 case '=': {
                     ex(p->opr.op[1], blbl, clbl);
-                    assign(p->opr.op[0]->id);
+                    assign(p->opr.op[0]->id, p->opr.op[1]->valueType);
                     break;
                 }
                 case UMINUS:
                     ex(p->opr.op[0], blbl, clbl);
+                    typeCheck(p->opr);
                     printf("\tneg\n");
                     break;
                 default:
                     ex(p->opr.op[0], blbl, clbl);
                     ex(p->opr.op[1], blbl, clbl);
+                    typeCheck(p->opr);
+                    auto left = p->opr.op[0]->valueType;
+                    auto right = p->opr.op[1]->valueType;
+                    if (applicable.count(p->opr.oper) > 0 and applicable[p->opr.oper].count(pair<valueEnum, valueEnum>{left, right})) {
+                        if (comparator.count(p->opr.oper) > 0) {
+                            p->valueType = BOOL;
+                        } else {
+                            if (left != right) {
+                                p->valueType = CHAR;
+                            } else {
+                                p->valueType = left;
+                            }
+                        }
+                    }
                     switch(p->opr.oper) {
                         case '+':   printf("\tadd\n"); break;
                         case '-':   printf("\tsub\n"); break;
@@ -223,22 +282,24 @@ void run(nodeType *p) {
     variableStack.push_back(map<int, pair<int, valueEnum>>{});
     reverseSymbolLookup = map<int, string>{{'+', "+"}, {'-', "-"}, {'*', "*"},
                                             {'/', "/"}, {'%', "%"}, {'<', "<"}, {'>', ">"}, {GE, ">="}, {LE, "<="},
-                                            {EQ, "=="}, {NE, "!="}, {AND, "&&"}, {OR, "||"}};
-    valueName = vector<string>{"string", "character", "integer", "function"};
-    appliable['+'] = set<pair<int, int> >{{INT, INT}, {INT, CHAR}, {CHAR, INT}};
-    appliable['-'] = set<pair<int, int> >{{INT, INT}, {INT, CHAR}, {CHAR, INT}};
-    appliable['*'] = set<pair<int, int> >{{INT, INT}};
-    appliable['/'] = appliable['*'];
-    appliable['%'] = appliable['*'];
-    appliable[GE] = set<pair<int, int> >{{CHAR, CHAR}, {INT, INT}};
-    appliable[LE] = appliable[GE];
-    appliable['>'] = appliable[GE];
-    appliable['<'] = appliable[GE];
-    appliable[EQ] = appliable[GE];
-    appliable[EQ].insert(pair<int, int>{BOOL, BOOL});
-    appliable[NE] = appliable[EQ];
-    appliable[AND] = set<pair<int, int> >{{BOOL, BOOL}};
-    appliable[OR] = appliable[AND];
+                                            {EQ, "=="}, {NE, "!="}, {AND, "&&"}, {OR, "||"}, {UMINUS, "-"}};
+    reverseTypeLookup = vector<string>{"None", "string", "character", "integer", "bool", "function"};
+    applicable['+'] = set<pair<valueEnum, valueEnum> >{{INT, INT}, {INT, CHAR}, {CHAR, INT}};
+    applicable['-'] = set<pair<valueEnum, valueEnum> >{{INT, INT}, {INT, CHAR}, {CHAR, INT}};
+    applicable['*'] = set<pair<valueEnum, valueEnum> >{{INT, INT}};
+    applicable['/'] = applicable['*'];
+    applicable['%'] = applicable['*'];
+    applicable[GE] = set<pair<valueEnum, valueEnum> >{{CHAR, CHAR}, {INT, INT}};
+    applicable[LE] = applicable[GE];
+    applicable['>'] = applicable[GE];
+    applicable['<'] = applicable[GE];
+    applicable[EQ] = applicable[GE];
+    applicable[EQ].insert(pair<valueEnum, valueEnum>{BOOL, BOOL});
+    applicable[NE] = applicable[EQ];
+    applicable[AND] = set<pair<valueEnum, valueEnum> >{{BOOL, BOOL}};
+    applicable[OR] = applicable[AND];
     comparator = set<int>{GE, LE, '<', '>', NE, EQ};
+    requiredType = {STR, CHAR, INT, STR, CHAR, INT, STR, CHAR, INT};
     ex(p, 998, 998);
+    ;
 }

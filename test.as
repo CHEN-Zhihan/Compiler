@@ -1,7 +1,5 @@
 	push	1
-	push	sb[0]
-	push	'c'
-	add
-	pop	sb[0]
-	push	sb[0]
-	putc
+	j0	L000
+	push	"I am in"
+	puts
+L000:
