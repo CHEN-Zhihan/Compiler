@@ -41,6 +41,7 @@ struct idNodeType{
 struct funcNodeType {
     int i;
     list<nodeType *> * parameters;
+    list<nodeType *> * arguments;
     nodeType * stmts;
 };
 

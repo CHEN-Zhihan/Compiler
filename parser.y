@@ -33,19 +33,12 @@ nodeType *opr(int oper, int nops, ...);
 nodeType *con(int value);
 nodeType *con(const char * value);
 nodeType *con(char value);
-list<nodeType *> *append(nodeType *);
-list<nodeType *> *append(list<nodeType *> *, nodeType *);
 nodeType *id(const char *, bool isGlobal=false);
-nodeType *append(nodeType *, nodeType *);
 nodeType *call(const char *, list<nodeType *> *);
 nodeType *func(const char *, list<nodeType*> *, nodeType *);
-nodeType *define(const char*, nodeType*);
-list<nodeType*> * buildParList();
-list<nodeType*> * buildParList(nodeType*);
-list<nodeType*> * buildParList(nodeType*, list<nodeType *> *);
-list<nodeType *> * buildArgList();
-list<nodeType *> * buildArgList(nodeType *);
-list<nodeType *> * buildArgList(nodeType *, list<nodeType *> *);
+list<nodeType *> * buildList();
+list<nodeType *> * buildList(nodeType *);
+list<nodeType *> * buildList(nodeType *, list<nodeType *> *);
 void freeNode(nodeType *p);
 int ex(nodeType *p, int, int);
 void eop();
@@ -55,6 +48,7 @@ void yyerror(char *s);
 static map<string, int> variableMap;
 vector<string> reverseLookup;
 set<int> functionSet;
+map<int, int> numVariables;
 static int variableCounter;
 %}
 %debug
@@ -71,7 +65,7 @@ static int variableCounter;
 %token <cValue> CHARACTER
 %token <sValue> STRING
 %token <variable> VARIABLE
-%token FOR WHILE IF PRINT READ BREAK CONTINUE DEF END
+%token FOR WHILE IF PRINT READ BREAK CONTINUE DEF END RETURN
 %nonassoc IFX
 %nonassoc ELSE
 
@@ -91,15 +85,15 @@ program:
         ;
 
 parameterList:
-        variable                            { $$ = buildParList($1);}
-        | variable ',' parameterList        { $$ = buildParList($1, $3);}
-        |                                   { $$ = buildParList();}
+        variable                            { $$ = buildList($1);}
+        | variable ',' parameterList        { $$ = buildList($1, $3);}
+        |                                   { $$ = buildList();}
         ;
 
 argumentList:
-        expr                                  { $$ = buildArgList($1);}
-        | expr ',' argumentList               { $$ = buildArgList($1, $3);}
-        |                                     { $$ = buildArgList();}
+        expr                                  { $$ = buildList($1);}
+        | expr ',' argumentList               { $$ = buildList($1, $3);}
+        |                                     { $$ = buildList();}
         ;
 
 stmt:
@@ -113,6 +107,8 @@ stmt:
         | '{' stmt_list '}'                   { $$ = $2;}
         | BREAK                               { $$ = opr(BREAK, 0);}
         | CONTINUE                            { $$ = opr(CONTINUE, 0);}
+        | RETURN expr ';'                     { $$ = opr(RETURN, 1, $2);}
+        | RETURN ';'                          { $$ = opr(RETURN, 0);}  
         | DEF VARIABLE '(' parameterList ')' '{' stmt_list '}'    { $$ = func($2, $4, $7);}
         ;
 
@@ -209,37 +205,15 @@ nodeType *opr(int oper, int nops, ...) {
 }
 
 
-list<nodeType *> *append(nodeType *p) {
-    return new list<nodeType*>{p};
-}
-
-list<nodeType *> *append(list<nodeType*> * l, nodeType * p) {
-    l->push_back(p);
-    return l;
-}
-
-list<nodeType *> * buildParList() {
-    return new list<nodeType *>();
-}
-
-list<nodeType *> * buildParList(nodeType * parameter) {
-    return new list<nodeType *>{parameter};
-}
-
-list<nodeType *> * buildParList(nodeType * parameter, list<nodeType*> * l) {
-    l->push_front(parameter);
-    return l;
-}
-
-list<nodeType *> * buildArgList() {
+list<nodeType *> * buildList() {
     auto p = new list<nodeType*>();
     return p;
 }
 
-list<nodeType *> * buildArgList(nodeType * p) {
+list<nodeType *> * buildList(nodeType * p) {
     return new list<nodeType*>{p};
 }
-list<nodeType *> * buildArgList(nodeType *n , list<nodeType *> *l) {
+list<nodeType *> * buildList(nodeType *n , list<nodeType *> *l) {
     l->push_front(n);
     return l;
 }
@@ -251,12 +225,9 @@ nodeType *func(const char * name, list<nodeType*> *parameters, nodeType *stmts) 
     }
     p->type = typeFunc;
     p->func.parameters = parameters;
+    p->func.arguments = new list<nodeType*>();
     p->func.stmts = stmts;
     string n = string(name);
-    if (variableMap.count(n) != 0) {
-        cerr << "Redefinition of function: " << n << endl;
-        exit(-1);
-    }
     p->func.i = variableCounter++;
     variableMap[n] = p->func.i;
     reverseLookup.push_back(n);
@@ -270,18 +241,12 @@ nodeType *id(const char * name, bool isGlobal) {
     if ((p = (nodeType*)malloc(nodeSize)) == NULL) {
         cerr << "out of memory!" << endl;;
     }
-    if (string(name) == "c") {
-        ;
-    }
     p->type = typeId;
     string n = string(name);
     if (variableMap.count(n) == 0) {
         p->id.i = variableCounter++;
         variableMap[n] = p->id.i;
         reverseLookup.push_back(n);
-    } else if (functionSet.count(variableMap[n]) != 0) {
-        cerr << "Cannot assign value to function: " << n << endl;
-        exit(-1);
     } else {
         p->id.i = variableMap[n];
     }
@@ -289,9 +254,32 @@ nodeType *id(const char * name, bool isGlobal) {
     return p;
 }
 
+nodeType *call(const char * name, list<nodeType *> * arguments) {
+    string n = string(name);
+    if (variableMap.count(n) == 0) {
+        cerr << "Call on undefined function: " << n << endl;
+        exit(-1);
+    }
+    nodeType * p;
+    if ((p = (nodeType*)malloc(SIZEOF_NODETYPE + sizeof(callNodeType))) == nullptr) {
+        cerr << "out of memory" << endl;
+    }
+    p->type = typeCall;
+    p->call.i = variableMap[n];
+    p->call.arguments = arguments;
+    return p;
+}
+
+void init() {
+    for (auto & i: {"gets", "getc", "geti", "puts", "putc", "puti", "puts_", "putc_", "puti_"}) {
+        variableMap[i] = variableCounter ++;
+        functionSet.insert(variableCounter - 1);
+        reverseLookup.push_back(i);
+    }
+}
+
 void freeNode(nodeType *p) {
     int i;
-
     if (!p) return;
     if (p->type == typeOpr) {
         for (i = 0; i < p->opr.nops; i++)
@@ -301,31 +289,6 @@ void freeNode(nodeType *p) {
         free((char*)p->con.sValue);
     }
     free (p);
-}
-
-nodeType *call(const char * name, list<nodeType *> * arguments) {
-    string n = string(name);
-    if (variableMap.count(n) == 0) {
-        cerr << "Call on undefined function: " << n << endl;
-        exit(-1);
-    }
-    int index = variableMap[n];
-    nodeType * p;
-    if ((p = (nodeType*)malloc(SIZEOF_NODETYPE + sizeof(callNodeType))) == nullptr) {
-        cerr << "out of memory" << endl;
-    }
-    p->type = typeCall;
-    p->call.i = index;
-    p->call.arguments = arguments;
-    return p;
-}
-
-void init() {
-    for (auto & i: {"gets", "getc", "geti", "puts", "putc", "puti", "gets_", "putc_", "puti_"}) {
-        variableMap[i] = variableCounter ++;
-        functionSet.insert(variableCounter - 1);
-        reverseLookup.push_back(i);
-    }
 }
 
 int main(int argc, const char *argv[]) {

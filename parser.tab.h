@@ -58,15 +58,16 @@ extern int yydebug;
     CONTINUE = 268,
     DEF = 269,
     END = 270,
-    IFX = 271,
-    ELSE = 272,
-    AND = 273,
-    OR = 274,
-    GE = 275,
-    LE = 276,
-    EQ = 277,
-    NE = 278,
-    UMINUS = 279
+    RETURN = 271,
+    IFX = 272,
+    ELSE = 273,
+    AND = 274,
+    OR = 275,
+    GE = 276,
+    LE = 277,
+    EQ = 278,
+    NE = 279,
+    UMINUS = 280
   };
 #endif
 
@@ -75,7 +76,7 @@ extern int yydebug;
 
 union YYSTYPE
 {
-#line 61 "parser.y" /* yacc.c:1909  */
+#line 55 "parser.y" /* yacc.c:1909  */
 
     int iValue;                 /* integer value */
     char cValue;
@@ -84,7 +85,7 @@ union YYSTYPE
     nodeType *nPtr;             /* node pointer */
     list<nodeType *> *arguments;
 
-#line 88 "parser.tab.h" /* yacc.c:1909  */
+#line 89 "parser.tab.h" /* yacc.c:1909  */
 };
 
 typedef union YYSTYPE YYSTYPE;

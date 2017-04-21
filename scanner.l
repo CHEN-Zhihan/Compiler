@@ -20,6 +20,9 @@ void yyerror(char *);
 
 [a-zA-Z][a-zA-Z0-9_]*    {
                             string temp = string(yytext);
+                            if (temp == "return") {
+                                return RETURN;
+                            }
                             if (temp == "for") {
                                 return FOR;
                             }

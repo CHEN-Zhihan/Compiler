@@ -5,6 +5,9 @@ run:c6
 	./c6 test.hc > test.as
 	./cvm test.as
 
+compile: c6
+	./c6 test.hc
+
 scanner.cpp: scanner.l
 	flex  -o scanner.cpp scanner.l
 
