@@ -63,7 +63,7 @@ static int variableCounter;
 %token <cValue> CHARACTER
 %token <sValue> STRING
 %token <variable> VARIABLE
-%token FOR WHILE IF PRINT READ BREAK CONTINUE END RETURN
+%token FOR WHILE IF PRINT READ BREAK CONTINUE END RETURN DEF
 %nonassoc IFX
 %nonassoc ELSE
 
@@ -118,7 +118,7 @@ stmt:
         | CONTINUE                            { $$ = opr(CONTINUE, 0);}
         | RETURN expr ';'                     { $$ = opr(RETURN, 1, $2);}
         | RETURN ';'                          { $$ = opr(RETURN, 0);}  
-        | VARIABLE '(' parameterList ')' '{' stmt_list '}'    { $$ = func($2, $4, $7);}
+        | DEF VARIABLE '(' parameterList ')' '{' stmt_list '}'    { $$ = func($2, $4, $7);}
         ;
 
 constant:
@@ -249,6 +249,7 @@ nodeType *func(const string * name, list<nodeType*> *parameters, nodeType *stmts
         functionMap[{*name, parameters->size()}] = p->func.i;
         reverseLookup.push_back(*name);
     }
+    delete name;
     return p;
 }
 
@@ -267,6 +268,7 @@ nodeType *id(const string * name, bool isGlobal) {
         p->id.i = variableMap[*name];
     }
     p->id.global = isGlobal;
+    delete name;
     return p;
 }
 
@@ -284,6 +286,7 @@ nodeType *call(const string * name, list<nodeType *> * arguments) {
     p->valueType = UNSET;
     p->call.i = functionMap[{*name, arguments->size()}];
     p->call.arguments = arguments;
+    delete name;
     return p;
 }
 
@@ -302,7 +305,17 @@ void freeNode(nodeType *p) {
             freeNode(p->opr.op[i]);
     }
     if (p->type == typeCon and p->valueType == STR) {
-        free((char*)p->con.sValue);
+        delete p->con.sValue;
+    } else if (p->type == typeCall) {
+        for (auto& i : *p->call.arguments) {
+            freeNode(i);
+        }
+        delete p->call.arguments;
+    } else if (p->type == typeFunc) {
+        for (auto & i : *p->func.parameters) {
+            freeNode(i);
+        }
+        delete p->func.parameters;
     }
     free (p);
 }

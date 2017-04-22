@@ -409,7 +409,7 @@ static yyconst flex_int16_t yy_accept[41] =
         0,    0,   18,   16,   15,   15,   16,   16,    4,   16,
        16,    4,    2,    3,    4,    4,    4,    1,    1,   16,
        15,   10,    0,    5,   11,    0,    0,    3,    8,    9,
-        7,    1,    1,   12,    6,    0,   14,    1,   13,    0
+        7,    1,    1,   12,    6,    0,   13,    1,   14,    0
     } ;
 
 static yyconst YY_CHAR yy_ec[256] =
@@ -498,7 +498,7 @@ static yyconst flex_int16_t yy_chk[82] =
 /* Table of booleans, true if rule could match eol. */
 static yyconst flex_int32_t yy_rule_can_match_eol[18] =
     {   0,
-0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0,     };
+0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0,     };
 
 static yy_state_type yy_last_accepting_state;
 static char *yy_last_accepting_cpos;
@@ -925,34 +925,34 @@ YY_RULE_SETUP
 return OR;
 	YY_BREAK
 case 13:
+/* rule 13 can match eol */
 YY_RULE_SETUP
 #line 78 "scanner.l"
-return DEF;
+;    /* skip comments */
 	YY_BREAK
 case 14:
-/* rule 14 can match eol */
 YY_RULE_SETUP
 #line 79 "scanner.l"
-;    /* skip comments */
+return DEF;
 	YY_BREAK
 case 15:
 /* rule 15 can match eol */
 YY_RULE_SETUP
-#line 81 "scanner.l"
+#line 80 "scanner.l"
 ;       /* ignore whitespace */
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 83 "scanner.l"
+#line 82 "scanner.l"
 yyerror(yytext);
 	YY_BREAK
 case YY_STATE_EOF(INITIAL):
-#line 84 "scanner.l"
+#line 83 "scanner.l"
 return END;
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 85 "scanner.l"
+#line 84 "scanner.l"
 ECHO;
 	YY_BREAK
 #line 959 "scanner.cpp"
@@ -1966,7 +1966,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 85 "scanner.l"
+#line 84 "scanner.l"
 
 
 
