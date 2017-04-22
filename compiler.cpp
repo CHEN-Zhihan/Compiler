@@ -135,15 +135,17 @@ void preAssign(idNodeType node, valueEnum type, const vector<scope>& sList, int 
 
 void defineFunctions() {
     for (const auto& i : functionTable) {
-        int tempVariables = int(addressTable[i.first].size() - i.second->func.parameters->size());
-        printf("L%03d:\n", functionLabel[i.first]);        
-        if (tempVariables != 0) {
-            printf("\tpush\t%d\n", tempVariables);
-            printf("\tpush\tsp\n");   
-            printf("\tadd\n");
-            printf("\tpop\tsp\n");
+        if (functionLabel.count(i.first) != 0) {
+            int tempVariables = int(addressTable[i.first].size() - i.second->func.parameters->size());
+            printf("L%03d:\n", functionLabel[i.first]);        
+            if (tempVariables != 0) {
+                printf("\tpush\t%d\n", tempVariables);
+                printf("\tpush\tsp\n");   
+                printf("\tadd\n");
+                printf("\tpop\tsp\n");
+            }
+            ex(i.second->func.stmts, 998, 998, i.first);
         }
-        ex(i.second->func.stmts, 998, 998, i.first);
     }
 }
 
@@ -209,11 +211,6 @@ void preCheck(nodeType *&p, vector<scope>& sList, int functionBase, int mode) {
                 for (auto& i: *callNode.arguments) {
                     preCheck(i, sList, functionBase, mode);
                 }
-                if (target.parameters->size() != callNode.arguments->size()) {
-                    cerr << "Incorrect argument number for function " << reverseLookup[callNode.i]
-                        << " expect " << target.parameters->size() << ", got " << callNode.arguments->size() << endl;
-                    exit(-1);
-                } 
                 cerr << "calling " << reverseLookup[FID] << endl;
                 if (functionLabel.count(FID) == 0) {
                     functionLabel[FID] = lbl++;

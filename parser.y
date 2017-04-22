@@ -40,11 +40,11 @@ list<nodeType *> * buildList();
 list<nodeType *> * buildList(nodeType *);
 list<nodeType *> * buildList(nodeType *, list<nodeType *> *);
 void freeNode(nodeType *p);
-void eop();
 void run(nodeType* p);
 int yylex(void);
 void yyerror(char *s);
 static map<string, int> variableMap;
+static map<pair<string, int>, int> functionMap;
 static set<int> toBeDefined;
 vector<string> reverseLookup;
 static int variableCounter;
@@ -78,8 +78,18 @@ static int variableCounter;
 %type <arguments> argumentList parameterList
 %%
 
+
+
 program:
-        stmt_list END                          {run($1); exit(0); }
+        stmt_list END                          {    if (toBeDefined.size() != 0) {
+                                                        for (const auto & i:toBeDefined) {
+                                                            cerr << "Call to undefined function: " << reverseLookup[i] << endl;
+                                                        }
+                                                        exit(-1);
+                                                    }
+                                                    run($1); exit(0); 
+
+                                                }
         ;
 
 parameterList:
@@ -225,17 +235,17 @@ nodeType *func(const string * name, list<nodeType*> *parameters, nodeType *stmts
     p->valueType = UNSET;
     p->func.parameters = parameters;
     p->func.stmts = stmts;
-    if (variableMap.count(*name) != 0) {
-        if (toBeDefined.count(variableMap[*name]) != 0) {
-            p->func.i = variableMap[*name];
-            toBeDefined.erase(variableMap[*name]);
+    if (functionMap.count({*name, parameters->size()}) != 0) {
+        if (toBeDefined.count(functionMap[{*name, parameters->size()}]) != 0) {
+            p->func.i = functionMap[{*name, parameters->size()}];
+            toBeDefined.erase(p->func.i);
         } else {
             cerr << "Redefinition of function: " << *name << endl;
             exit(-1);
         }
     } else {
         p->func.i = variableCounter++;
-        variableMap[*name] = p->func.i;
+        functionMap[{*name, parameters->size()}] = p->func.i;
         reverseLookup.push_back(*name);
     }
     return p;
@@ -261,8 +271,8 @@ nodeType *id(const string * name, bool isGlobal) {
 
 nodeType *call(const string * name, list<nodeType *> * arguments) {
     nodeType * p;
-    if (variableMap.count(*name) == 0) {
-        variableMap[*name] = variableCounter++;
+    if (functionMap.count({*name, arguments->size()}) == 0) {
+        functionMap[{*name, arguments->size()}] = variableCounter++;
         reverseLookup.push_back(*name);
         toBeDefined.insert(variableCounter - 1);
     }
@@ -271,14 +281,14 @@ nodeType *call(const string * name, list<nodeType *> * arguments) {
     }
     p->type = typeCall;
     p->valueType = UNSET;
-    p->call.i = variableMap[*name];
+    p->call.i = functionMap[{*name, arguments->size()}];
     p->call.arguments = arguments;
     return p;
 }
 
 void init() {
     for (auto & i: {"gets", "getc", "geti", "puts", "putc", "puti", "puts_", "putc_", "puti_"}) {
-        variableMap[i] = variableCounter ++;
+        functionMap[{i, 1}] = variableCounter ++;
         reverseLookup.push_back(i);
     }
 }
