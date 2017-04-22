@@ -40,7 +40,6 @@ list<nodeType *> * buildList();
 list<nodeType *> * buildList(nodeType *);
 list<nodeType *> * buildList(nodeType *, list<nodeType *> *);
 void freeNode(nodeType *p);
-int ex(nodeType *p, int, int);
 void eop();
 void run(nodeType* p);
 int yylex(void);
@@ -48,7 +47,6 @@ void yyerror(char *s);
 static map<string, int> variableMap;
 static set<int> toBeDefined;
 vector<string> reverseLookup;
-map<int, int> numVariables;
 static int variableCounter;
 %}
 %debug
@@ -224,6 +222,7 @@ nodeType *func(const string * name, list<nodeType*> *parameters, nodeType *stmts
         cerr << "out of memory" << endl;
     }
     p->type = typeFunc;
+    p->valueType = UNSET;
     p->func.parameters = parameters;
     p->func.stmts = stmts;
     if (variableMap.count(*name) != 0) {
@@ -271,7 +270,8 @@ nodeType *call(const string * name, list<nodeType *> * arguments) {
         cerr << "out of memory" << endl;
     }
     p->type = typeCall;
-    p->call.i = variableCounter - 1;
+    p->valueType = UNSET;
+    p->call.i = variableMap[*name];
     p->call.arguments = arguments;
     return p;
 }
