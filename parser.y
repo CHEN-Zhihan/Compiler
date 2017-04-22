@@ -85,8 +85,8 @@ program:
         ;
 
 parameterList:
-        variable                            { $$ = buildList($1);}
-        | variable ',' parameterList        { $$ = buildList($1, $3);}
+        VARIABLE                            { $$ = buildList(id($1));}
+        | VARIABLE ',' parameterList        { $$ = buildList(id($1), $3);}
         |                                   { $$ = buildList();}
         ;
 
