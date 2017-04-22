@@ -63,7 +63,7 @@ static int variableCounter;
 %token <cValue> CHARACTER
 %token <sValue> STRING
 %token <variable> VARIABLE
-%token FOR WHILE IF PRINT READ BREAK CONTINUE DEF END RETURN
+%token FOR WHILE IF PRINT READ BREAK CONTINUE END RETURN
 %nonassoc IFX
 %nonassoc ELSE
 
@@ -87,8 +87,9 @@ program:
                                                         }
                                                         exit(-1);
                                                     }
-                                                    run($1); exit(0); 
-
+                                                    run($1);
+                                                    freeNode($1);
+                                                    exit(0);
                                                 }
         ;
 
@@ -117,7 +118,7 @@ stmt:
         | CONTINUE                            { $$ = opr(CONTINUE, 0);}
         | RETURN expr ';'                     { $$ = opr(RETURN, 1, $2);}
         | RETURN ';'                          { $$ = opr(RETURN, 0);}  
-        | DEF VARIABLE '(' parameterList ')' '{' stmt_list '}'    { $$ = func($2, $4, $7);}
+        | VARIABLE '(' parameterList ')' '{' stmt_list '}'    { $$ = func($2, $4, $7);}
         ;
 
 constant:

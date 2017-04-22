@@ -75,7 +75,6 @@ void yyerror(char *);
 "!="        return NE;
 "&&"        return AND;
 "||"        return OR;
-"def "      return DEF;
 \/\/.*\n    ;    /* skip comments */
 
 [ \t\n]+    ;       /* ignore whitespace */
