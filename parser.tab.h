@@ -80,8 +80,8 @@ union YYSTYPE
 
     int iValue;                 /* integer value */
     char cValue;
-    const char * sValue;
-    const char * variable;
+    const string * sValue;
+    const string * variable;
     nodeType *nPtr;             /* node pointer */
     list<nodeType *> *arguments;
 

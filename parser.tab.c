@@ -96,11 +96,11 @@ using std::set;
 /* prototypes */
 nodeType *opr(int oper, int nops, ...);
 nodeType *con(int value);
-nodeType *con(const char * value);
+nodeType *con(const string * value);
 nodeType *con(char value);
-nodeType *id(const char *, bool isGlobal=false);
-nodeType *call(const char *, list<nodeType *> *);
-nodeType *func(const char *, list<nodeType*> *, nodeType *);
+nodeType *id(const string *, bool isGlobal=false);
+nodeType *call(const string *, list<nodeType *> *);
+nodeType *func(const string *, list<nodeType*> *, nodeType *);
 list<nodeType *> * buildList();
 list<nodeType *> * buildList(nodeType *);
 list<nodeType *> * buildList(nodeType *, list<nodeType *> *);
@@ -111,8 +111,8 @@ void run(nodeType* p);
 int yylex(void);
 void yyerror(char *s);
 static map<string, int> variableMap;
+static set<int> toBeDefined;
 vector<string> reverseLookup;
-set<int> functionSet;
 map<int, int> numVariables;
 static int variableCounter;
 
@@ -186,8 +186,8 @@ union YYSTYPE
 
     int iValue;                 /* integer value */
     char cValue;
-    const char * sValue;
-    const char * variable;
+    const string * sValue;
+    const string * variable;
     nodeType *nPtr;             /* node pointer */
     list<nodeType *> *arguments;
 
@@ -1921,7 +1921,7 @@ nodeType *con(char value) {
     return p;
 }
 
-nodeType *con(const char * value) {
+nodeType *con(const string * value) {
     nodeType * p = prepareConstant();
     p->valueType = STR;
     p->con.sValue = value;
@@ -1964,54 +1964,60 @@ list<nodeType *> * buildList(nodeType *n , list<nodeType *> *l) {
     return l;
 }
 
-nodeType *func(const char * name, list<nodeType*> *parameters, nodeType *stmts) {
+nodeType *func(const string * name, list<nodeType*> *parameters, nodeType *stmts) {
     nodeType * p;
     if ((p = (nodeType*)malloc(SIZEOF_NODETYPE + sizeof(funcNodeType))) == nullptr) {
         cerr << "out of memory" << endl;
     }
     p->type = typeFunc;
     p->func.parameters = parameters;
-    p->func.arguments = new list<nodeType*>();
     p->func.stmts = stmts;
-    string n = string(name);
-    p->func.i = variableCounter++;
-    variableMap[n] = p->func.i;
-    reverseLookup.push_back(n);
-    functionSet.insert(p->func.i);
+    if (variableMap.count(*name) != 0) {
+        if (toBeDefined.count(variableMap[*name]) != 0) {
+            p->func.i = variableMap[*name];
+            toBeDefined.erase(variableMap[*name]);
+        } else {
+            cerr << "Redefinition of function: " << *name << endl;
+            exit(-1);
+        }
+    } else {
+        p->func.i = variableCounter++;
+        variableMap[*name] = p->func.i;
+        reverseLookup.push_back(*name);
+    }
     return p;
 }
 
-nodeType *id(const char * name, bool isGlobal) {
+nodeType *id(const string * name, bool isGlobal) {
     nodeType * p;
     size_t nodeSize = SIZEOF_NODETYPE + sizeof(idNodeType);
     if ((p = (nodeType*)malloc(nodeSize)) == NULL) {
         cerr << "out of memory!" << endl;;
     }
     p->type = typeId;
-    string n = string(name);
-    if (variableMap.count(n) == 0) {
+    if (variableMap.count(*name) == 0) {
         p->id.i = variableCounter++;
-        variableMap[n] = p->id.i;
-        reverseLookup.push_back(n);
+        variableMap[*name] = p->id.i;
+        reverseLookup.push_back(*name);
     } else {
-        p->id.i = variableMap[n];
+        p->id.i = variableMap[*name];
     }
     p->id.global = isGlobal;
     return p;
 }
 
-nodeType *call(const char * name, list<nodeType *> * arguments) {
-    string n = string(name);
-    if (variableMap.count(n) == 0) {
-        cerr << "Call on undefined function: " << n << endl;
-        exit(-1);
-    }
+nodeType *call(const string * name, list<nodeType *> * arguments) {
     nodeType * p;
+    if (variableMap.count(*name) == 0) {
+        variableMap[*name] = variableCounter++;
+        reverseLookup.push_back(*name);
+        toBeDefined.insert(variableCounter - 1);
+    }
     if ((p = (nodeType*)malloc(SIZEOF_NODETYPE + sizeof(callNodeType))) == nullptr) {
         cerr << "out of memory" << endl;
     }
     p->type = typeCall;
-    p->call.i = variableMap[n];
+    p->call.i = variableCounter - 1;
     p->call.arguments = arguments;
     return p;
 }
@@ -2019,7 +2025,6 @@ nodeType *call(const char * name, list<nodeType *> * arguments) {
 void init() {
     for (auto & i: {"gets", "getc", "geti", "puts", "putc", "puti", "puts_", "putc_", "puti_"}) {
         variableMap[i] = variableCounter ++;
-        functionSet.insert(variableCounter - 1);
         reverseLookup.push_back(i);
     }
 }

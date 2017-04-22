@@ -11,6 +11,7 @@ enum nodeEnum{ typeCon, typeId, typeOpr, typeFunc, typeCall };
 
 
 enum valueEnum {
+    UNSET,
     NONE,
     STR,
     CHAR,
@@ -27,7 +28,7 @@ struct conNodeType {
     union {
         int iValue;
         char cValue;
-        const char * sValue;
+        const string * sValue;
     };
 };
 
@@ -41,7 +42,6 @@ struct idNodeType{
 struct funcNodeType {
     int i;
     list<nodeType *> * parameters;
-    list<nodeType *> * arguments;
     nodeType * stmts;
 };
 

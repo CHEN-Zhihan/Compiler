@@ -852,7 +852,7 @@ YY_RULE_SETUP
                                 exit(0);
                             }
                             transform(temp.begin(), temp.end(), temp.begin(), [](char i) -> char {return tolower(i);});
-                            yylval.variable = strdup(yytext);
+                            yylval.variable = new string(temp);
                             return VARIABLE;
                         }
 	YY_BREAK
@@ -884,7 +884,7 @@ case 5:
 YY_RULE_SETUP
 #line 67 "scanner.l"
 {
-                yylval.sValue = strdup(yytext);
+                yylval.sValue = new string(yytext);
                 return STRING;
             }
 	YY_BREAK

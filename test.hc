@@ -1,12 +1,3 @@
-def c(a) {
-    ;
+def abcsdfegadsfad(gg) {
+    return gg;
 }
-
-def main() {
-    b = c;
-    b(10);
-    b();
-    b = 5;
-}
-
-main();

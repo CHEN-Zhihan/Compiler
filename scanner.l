@@ -48,7 +48,7 @@ void yyerror(char *);
                                 exit(0);
                             }
                             transform(temp.begin(), temp.end(), temp.begin(), [](char i) -> char {return tolower(i);});
-                            yylval.variable = strdup(yytext);
+                            yylval.variable = new string(temp);
                             return VARIABLE;
                         }
 0           {
@@ -65,7 +65,7 @@ void yyerror(char *);
                 return *yytext;
              }
 \"[^\"]*\"  {
-                yylval.sValue = strdup(yytext);
+                yylval.sValue = new string(yytext);
                 return STRING;
             }
 \'[^\']\'   {yylval.cValue = yytext[1]; return CHARACTER;}
