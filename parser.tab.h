@@ -79,7 +79,7 @@ union YYSTYPE
 #line 53 "parser.y" /* yacc.c:1909  */
 
     int iValue;                 /* integer value */
-    char cValue;
+    const string * cValue;
     const string * sValue;
     const string * variable;
     nodeType *nPtr;             /* node pointer */

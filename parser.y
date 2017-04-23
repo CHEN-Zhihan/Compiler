@@ -32,7 +32,7 @@ using std::set;
 nodeType *opr(int oper, int nops, ...);
 nodeType *con(int value);
 nodeType *con(const string * value);
-nodeType *con(char value);
+nodeType *conChar(const string * value);
 nodeType *id(const string *, bool isGlobal=false);
 nodeType *call(const string *, list<nodeType *> *);
 nodeType *func(const string *, list<nodeType*> *, nodeType *);
@@ -52,7 +52,7 @@ static int variableCounter;
 %debug
 %union {
     int iValue;                 /* integer value */
-    char cValue;
+    const string * cValue;
     const string * sValue;
     const string * variable;
     nodeType *nPtr;             /* node pointer */
@@ -124,7 +124,7 @@ stmt:
 constant:
         INTEGER                     { $$ = con($1);}
         | STRING                    { $$ = con($1);}
-        | CHARACTER                 { $$ = con($1);}
+        | CHARACTER                 { $$ = conChar($1);}
 
 variable:
         VARIABLE                { $$ = id($1);}
@@ -177,7 +177,7 @@ nodeType *con(int value) {
     return p;
 }
 
-nodeType *con(char value) {
+nodeType *conChar(const string * value) {
     nodeType * p = prepareConstant();
     p->valueType = CHAR;
     p->con.cValue = value;

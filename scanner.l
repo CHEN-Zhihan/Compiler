@@ -4,9 +4,7 @@ using std::atoi;
 #include <cstring>
 using std::strlen;
 #include <string>
-using std::string;  using std::tolower;
-#include <algorithm>
-using std::transform;
+using std::string;
 #include <list>
 using std::list;
 #include <iostream>
@@ -15,7 +13,7 @@ using std::cout;    using std::endl;
 #include "parser.tab.h"
 void yyerror(char *);
 %}
-%option yylineno
+%option yylineno caseless
 %%
 
 [a-zA-Z][a-zA-Z0-9_]*    {
@@ -47,7 +45,6 @@ void yyerror(char *);
                                 yyerror(buffer);
                                 exit(0);
                             }
-                            transform(temp.begin(), temp.end(), temp.begin(), [](char i) -> char {return tolower(i);});
                             yylval.variable = new string(temp);
                             return VARIABLE;
                         }
@@ -68,7 +65,9 @@ void yyerror(char *);
                 yylval.sValue = new string(yytext);
                 return STRING;
             }
-\'[^\']\'   {yylval.cValue = yytext[1]; return CHARACTER;}
+\'[^\'\\]\'   {yylval.cValue = new string(yytext); return CHARACTER;}
+'\\[ntr0\']'       {yylval.cValue = new string(yytext);  return CHARACTER;}
+'\\\\'       {yylval.cValue = new string(yytext);  return CHARACTER;}
 ">="        return GE;
 "<="        return LE;
 "=="        return EQ;

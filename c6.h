@@ -27,7 +27,7 @@ struct nodeType;
 struct conNodeType {
     union {
         int iValue;
-        char cValue;
+        const string * cValue;
         const string * sValue;
     };
 };

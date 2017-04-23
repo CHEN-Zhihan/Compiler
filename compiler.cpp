@@ -347,7 +347,7 @@ int ex(nodeType *p, int blbl, int clbl, functionID function) {
                     printf("\tpush\t%d\n", p->con.iValue);
                     break;
                 } case CHAR: {
-                    printf("\tpush\t'%c'\n", p->con.cValue);
+                    printf("\tpush\t%s\n", p->con.cValue->c_str());
                     break;
                 } case STR: {
                     printf("\tpush\t%s\n", p->con.sValue->c_str());

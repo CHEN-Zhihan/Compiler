@@ -97,7 +97,7 @@ using std::set;
 nodeType *opr(int oper, int nops, ...);
 nodeType *con(int value);
 nodeType *con(const string * value);
-nodeType *con(char value);
+nodeType *conChar(const string * value);
 nodeType *id(const string *, bool isGlobal=false);
 nodeType *call(const string *, list<nodeType *> *);
 nodeType *func(const string *, list<nodeType*> *, nodeType *);
@@ -183,7 +183,7 @@ union YYSTYPE
 #line 53 "parser.y" /* yacc.c:355  */
 
     int iValue;                 /* integer value */
-    char cValue;
+    const string * cValue;
     const string * sValue;
     const string * variable;
     nodeType *nPtr;             /* node pointer */
@@ -1532,7 +1532,7 @@ yyreduce:
 
   case 24:
 #line 127 "parser.y" /* yacc.c:1646  */
-    { (yyval.nPtr) = con((yyvsp[0].cValue));}
+    { (yyval.nPtr) = conChar((yyvsp[0].cValue));}
 #line 1537 "parser.tab.c" /* yacc.c:1646  */
     break;
 
@@ -1921,7 +1921,7 @@ nodeType *con(int value) {
     return p;
 }
 
-nodeType *con(char value) {
+nodeType *conChar(const string * value) {
     nodeType * p = prepareConstant();
     p->valueType = CHAR;
     p->con.cValue = value;
