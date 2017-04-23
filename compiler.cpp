@@ -116,11 +116,13 @@ void preAssign(idNodeType node, valueEnum type, const vector<scope>& sList, int 
         auto s = getDefinitionScope(variable, sList, functionBase);
         if (s == -1) {
             variableTable[sList.back()][variable] = type;
-            auto size = addressTable[sList[functionBase]].size();
-            if (sList[functionBase] != GLOBAL) {
-                size -= functionTable[sList[functionBase]]->func.parameters->size();
+            if (addressTable[sList[functionBase]].count(variable) == 0) {
+                auto size = addressTable[sList[functionBase]].size();
+                if (sList[functionBase] != GLOBAL) {
+                    size -= functionTable[sList[functionBase]]->func.parameters->size();
+                }
+                addressTable[sList[functionBase]][variable] = size;
             }
-            addressTable[sList[functionBase]][variable] = size;
         } else if (variableTable[s][variable] != UNSET and variableTable[s][variable] != type){
             cerr << "Assigning a " << reverseTypeLookup[type] << " to a(n) " << reverseTypeLookup[variableTable[s][variable]] << " variable" << endl;
             exit(-1);

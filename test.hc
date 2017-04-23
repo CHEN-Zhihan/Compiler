@@ -1,15 +1,12 @@
-def addition(a, b) {
-    return a + b;
-}
-
-
-def main(a, b) {
-    a = 20;
-    @a = addition(@a, a);
-    return @a;
-}
-
 a = 5;
-
-puti(main(a, 5));
-puti(a);
+c = 2;
+if (a == 1) {
+    b = 3;
+    c = a + b;
+    puti(c);
+} else {
+    b = 4;
+    c = a + b;
+    puti(c);
+}
+puti(c);

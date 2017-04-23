@@ -1,27 +1,36 @@
 	push	sp
-	push	1
+	push	3
 	add
 	pop	sp
 	push	5
 	pop	sb[0]
+	push	2
+	pop	sb[1]
 	push	sb[0]
-	push	5
-	call	L000, 2
+	push	1
+	compEQ
+	j0	L000
+	push	3
+	pop	sb[2]
+	push	sb[0]
+	push	sb[2]
+	add
+	pop	sb[1]
+	push	sb[1]
 	puti
+	push	"gg"
+	puts
+	jmp	L001
+L000:
+	push	4
+	pop	sb[2]
 	push	sb[0]
+	push	sb[2]
+	add
+	pop	sb[1]
+	push	sb[1]
+	puti
+L001:
+	push	sb[1]
 	puti
 	end
-L001:
-	push	fp[-5]
-	push	fp[-4]
-	add
-	ret
-L000:
-	push	20
-	pop	fp[-5]
-	push	sb[0]
-	push	fp[-5]
-	call	L001, 2
-	pop	sb[0]
-	push	sb[0]
-	ret
