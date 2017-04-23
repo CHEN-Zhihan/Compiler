@@ -61,12 +61,11 @@ void yyerror(char *);
 [-()<>=+*/;{}.%\[\]@,] {
                 return *yytext;
              }
-\"([^\"\\]|\\\"|\\[ntr0\\])*\"  {
+\"([^\"\\]|\\[ntr0\\\"])*\"  {
                 yylval.sValue = new string(yytext);
                 return STRING;
             }
-\'[^\'\\]\'   {yylval.cValue = new string(yytext); return CHARACTER;}
-\'\\[ntr0\'\\]\'       {yylval.cValue = new string(yytext);  return CHARACTER;}
+\'(\\[ntr0\'\\]|[^\'\\])\'       {yylval.cValue = new string(yytext);  return CHARACTER;}
 ">="        return GE;
 "<="        return LE;
 "=="        return EQ;

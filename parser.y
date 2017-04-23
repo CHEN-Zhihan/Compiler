@@ -304,8 +304,12 @@ void freeNode(nodeType *p) {
         for (i = 0; i < p->opr.nops; i++)
             freeNode(p->opr.op[i]);
     }
-    if (p->type == typeCon and p->valueType == STR) {
-        delete p->con.sValue;
+    if (p->type == typeCon) {
+        if (p->valueType == STR) {
+            delete p->con.sValue;
+        } else if (p->valueType == CHAR) {
+            delete p->con.cValue;
+        }
     } else if (p->type == typeCall) {
         for (auto& i : *p->call.arguments) {
             freeNode(i);

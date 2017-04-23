@@ -122,6 +122,7 @@ void preAssign(idNodeType node, valueEnum type, const vector<scope>& sList, int 
             if (sList[functionBase] != GLOBAL) {
                 size -= functionTable[sList[functionBase]]->func.parameters->size();
             }
+            cerr << "assigning " << reverseLookup[variable] << " in " << sList.back() << endl;
             addressTable[sList[functionBase]][variable] = size;
         } else if (functionTable.count(variable) != 0) {
             cerr << "Assigning value to a function: " << reverseLookup[variable] << endl;
@@ -169,9 +170,8 @@ void preCheck(nodeType *&p, vector<scope>& sList, int functionBase, int mode) {
                     }
                     p->valueType = variableTable[GLOBAL][p->id.i];
                 } else {
-                    int found = false;
                     auto s = getDefinitionScope(p->id.i, sList, functionBase);
-                    if (s == -1) {
+                    if ((s == -1) || (s == 0 and sList[functionBase] != 0)) {
                         cerr << "Undefined reference to variable " << reverseLookup[p->id.i] << endl;
                         exit(-1);
                     }
@@ -182,7 +182,6 @@ void preCheck(nodeType *&p, vector<scope>& sList, int functionBase, int mode) {
         } case typeFunc: {
             funcNodeType function = p->func;
             functionTable[function.i] = p;
-            cerr << "defining " << reverseLookup[function.i]  << function.i << endl;
             for (auto i = function.parameters->begin(); i != function.parameters->end(); ++i) {
                 variableTable[function.i][(*i)->id.i] = UNSET;
             }
@@ -211,11 +210,10 @@ void preCheck(nodeType *&p, vector<scope>& sList, int functionBase, int mode) {
                 for (auto& i: *callNode.arguments) {
                     preCheck(i, sList, functionBase, mode);
                 }
-                cerr << "calling " << reverseLookup[FID] << endl;
                 if (functionLabel.count(FID) == 0) {
                     functionLabel[FID] = lbl++;
                 }
-                if (mode == REFERENCE_CHECK) {
+                if (mode == REFERENCE_CHECK and target.i != sList[functionBase]) {
                     variableTable[FID] = map<id, valueEnum>();
                     int counter = 0;
                     for (auto pi = target.parameters->begin(); pi != target.parameters->end(); ++pi) {
@@ -225,8 +223,8 @@ void preCheck(nodeType *&p, vector<scope>& sList, int functionBase, int mode) {
                         }
                         variableTable[target.i][(*pi)->id.i] = UNSET;
                     }
+                    addressTable[target.i] = map<id, int>();
                 }
-                addressTable[target.i] = map<id, int>();
                 int size = 0;
                 for (auto ai = callNode.arguments->begin(), pi = target.parameters->begin(); ai != callNode.arguments->end(); ++ai, ++pi) {
                     variableTable[target.i][(*pi)->id.i] = (*ai)->valueType;
@@ -239,7 +237,7 @@ void preCheck(nodeType *&p, vector<scope>& sList, int functionBase, int mode) {
                     }
                     preCheck(target.stmts, sList, sList.size() - 1, mode);
                     sList.pop_back();
-                    if (mode == VALUE_CHECK) {
+                    if (mode == REFERENCE_CHECK) {
                         functionChecked.insert(FID);
                     }
                 }
@@ -308,7 +306,7 @@ void preCheck(nodeType *&p, vector<scope>& sList, int functionBase, int mode) {
                             if (comparator.count(p->opr.oper) > 0) {
                                 p->valueType = BOOL;
                             } else if (left != right) {
-                                p->valueType = CHAR;
+                                p->valueType = INT;
                             } else {
                                 p->valueType = left;
                             }
@@ -494,9 +492,10 @@ void run(nodeType *p) {
     }
     comparator = set<int>{GE, LE, '<', '>', NE, EQ};
     requiredType = {STR, CHAR, INT, STR, CHAR, INT, STR, CHAR, INT};
+    
+    scopeCounter = 1;
     vector<scope> sList{GLOBAL};
     preCheck(p, sList, GLOBAL, REFERENCE_CHECK);
-    cerr << "preCheck succeeded" << endl;
     if (addressTable[GLOBAL].size() != 0) {
         printf("\tpush\tsp\n");
         printf("\tpush\t%d\n", int(addressTable[GLOBAL].size()));
@@ -504,7 +503,6 @@ void run(nodeType *p) {
         printf("\tpop\tsp\n");
     }
     ex(p, 998, 998, GLOBAL);
-    printf("\tjmp\tL999\n");
+    printf("\tend\n");
     defineFunctions();
-    printf("L999:\n");
 }
