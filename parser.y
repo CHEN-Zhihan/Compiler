@@ -45,6 +45,7 @@ int yylex(void);
 void yyerror(char *s);
 static map<string, int> variableMap;
 static map<pair<string, int>, int> functionMap;
+static set<string> functionSet;
 static set<int> toBeDefined;
 vector<string> reverseLookup;
 static int variableCounter;
@@ -236,19 +237,23 @@ nodeType *func(const string * name, list<nodeType*> *parameters, nodeType *stmts
     p->valueType = UNSET;
     p->func.parameters = parameters;
     p->func.stmts = stmts;
+    if (variableMap.count(*name) != 0) {
+        cerr << *name << " has been declared as a variable" << endl;
+        exit(-1);
+    }
     if (functionMap.count({*name, parameters->size()}) != 0) {
-        if (toBeDefined.count(functionMap[{*name, parameters->size()}]) != 0) {
-            p->func.i = functionMap[{*name, parameters->size()}];
-            toBeDefined.erase(p->func.i);
-        } else {
+        if (toBeDefined.count(functionMap[{*name, parameters->size()}]) == 0) {
             cerr << "Redefinition of function: " << *name << endl;
             exit(-1);
         }
+        p->func.i = functionMap[{*name, parameters->size()}];
+        toBeDefined.erase(p->func.i);
     } else {
         p->func.i = variableCounter++;
         functionMap[{*name, parameters->size()}] = p->func.i;
         reverseLookup.push_back(*name);
     }
+    functionSet.insert(*name);    
     delete name;
     return p;
 }
@@ -260,12 +265,16 @@ nodeType *id(const string * name, bool isGlobal) {
         cerr << "out of memory!" << endl;;
     }
     p->type = typeId;
+    if (functionSet.count(*name) != 0) {
+        cerr << *name << " has been declared as a function" << endl;
+        exit(-1);
+    } 
     if (variableMap.count(*name) == 0) {
         p->id.i = variableCounter++;
         variableMap[*name] = p->id.i;
         reverseLookup.push_back(*name);
     } else {
-        p->id.i = variableMap[*name];
+        p->id.i = variableMap[*name];        
     }
     p->id.global = isGlobal;
     delete name;
@@ -293,6 +302,7 @@ nodeType *call(const string * name, list<nodeType *> * arguments) {
 void init() {
     for (auto & i: {"gets", "getc", "geti", "puts", "putc", "puti", "puts_", "putc_", "puti_"}) {
         functionMap[{i, 1}] = variableCounter ++;
+        functionSet.insert(i);
         reverseLookup.push_back(i);
     }
 }

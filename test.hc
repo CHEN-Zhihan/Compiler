@@ -1,8 +1,15 @@
-def main(main, a) {
-    if (main == 5) {
-        return 4;
-    }
-    return main(main - 1, a);
+def addition(a, b) {
+    return a + b;
 }
 
-puti(main(6, 4));
+
+def main(a, b) {
+    a = 20;
+    @a = addition(@a, a);
+    return @a;
+}
+
+a = 5;
+
+puti(main(a, 5));
+puti(a);
