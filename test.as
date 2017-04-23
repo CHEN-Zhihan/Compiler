@@ -1,4 +1,4 @@
-	push	'\0'
-	putc
+	push	"\"\t"
+	puts
 	jmp	L999
 L999:
