@@ -28,8 +28,9 @@ using operatorID = int;
 
 #define ADDSCOPE(node)\
     sList.push_back(++scopeCounter);\
-    variableTable[scopeCounter] = map<id, valueEnum>();\
-    preCheck(node, sList, functionBase, mode);\
+    variableTable[scopeCounter] = set<id>();\
+    functionTable[scopeCounter] = map<functionID, nodeType *>();\
+    preCheck(node, sList, functionBase);\
     sList.pop_back();
 
 
@@ -39,19 +40,20 @@ constexpr int VALUE_CHECK = 1;
 constexpr int REFERENCE_CHECK = 2;
 
 extern vector<string> reverseLookup;/* maps a variable identifier to a name*/
-
-static set<operatorID> comparator;/*determine whether an operator is a comparator. If yes, the resulting type should be BOOL*/
-static map<operatorID, string> reverseSymbolLookup; /*maps an operator to its name*/
-static map<id, set<pair<valueEnum, valueEnum> > > applicable; /*maps an operator to the set of operands it can perform on.*/
-static vector<string> reverseTypeLookup; /*maps an valueEnum value to its name.*/
+map<scope, map<functionID, nodeType *> > functionTable;
+static map<scope, set<id> > variableTable;
+/*
+static set<operatorID> comparator;/*determine whether an operator is a comparator. If yes, the resulting type should be BOOL
+static map<operatorID, string> reverseSymbolLookup; /*maps an operator to its name
+static map<id, set<pair<valueEnum, valueEnum> > > applicable; /*maps an operator to the set of operands it can perform on.
+static vector<string> reverseTypeLookup; /*maps an valueEnum value to its name.
 static vector<valueEnum> requiredType; /*maps a variable identifier to the type of arguments. Used for built-in functions.*/
 
 static scope scopeCounter;
-static map<functionID, nodeType *> functionTable; /*record all functions defined*/
-static map<scope, map<id, valueEnum> > variableTable; /*map the id of a function to the variableTable a function holds*/
 static set<functionID> functionChecked;
 static map<functionID, int> functionLabel;
 static map<functionID, map<id, int> > addressTable;
+
 int ex(nodeType*, int, int, functionID);
 
 scope getDefinitionScope(id target, const vector<scope>& sList, int functionBase) {
@@ -62,7 +64,7 @@ scope getDefinitionScope(id target, const vector<scope>& sList, int functionBase
     }
     return variableTable[GLOBAL].count(target) != 0? GLOBAL:-1;
 }
-
+/*
 void typeCheck(const nodeType * p, const callNodeType & c) {
     if (c.i >= 3 and c.i < 9 and p->valueType != requiredType[c.i]) {
         cerr << "Invalid call to function: " << reverseLookup[c.i]
@@ -95,148 +97,181 @@ void typeCheck(const oprNodeType &p) {
     }
 }
 
+*/
 
-
-void preAssign(idNodeType node, valueEnum type, const vector<scope>& sList, int functionBase) {
+void preAssign(idNodeType& node, const vector<scope>& sList, int functionBase, bool function=false) {
     int variable = node.i;
-    if (type == NONE) {
-        cerr << "Assigning None to variable: " << reverseLookup[variable] << endl;
-        exit(-1);
-    }
-    if (node.global) {
-        if (variableTable[GLOBAL].count(variable) == 0) {
-            cerr << "Reference to undefined global variable: " << reverseLookup[variable] << endl;
+    cout << functionTable[GLOBAL].size() << endl;
+    if (functionTable[GLOBAL].count(variable) != 0) {
+        auto temp = functionTable[GLOBAL][variable];
+        if (!temp or temp->id.function.origin == temp->id.i) {
+            cerr << "Redefinition of function " << reverseLookup[variable] << endl;
             exit(-1);
         }
-        if (variableTable[GLOBAL][variable] != UNSET and variableTable[GLOBAL][variable] != type) {
-            cerr << "Assigning a " << reverseTypeLookup[type] << " to a(n) " << reverseTypeLookup[variableTable[GLOBAL][variable]] << " variable" << endl;
+    }
+    if (node.type == VAR and node.global) {
+        if (variableTable[GLOBAL].count(variable) == 0) {
+            cerr << "Reference to undefined global variable: " << reverseLookup[variable] << endl;
             exit(-1);
         }
     } else {
         auto s = getDefinitionScope(variable, sList, functionBase);
         if (s == -1) {
-            variableTable[sList.back()][variable] = type;
-            if (addressTable[sList[functionBase]].count(variable) == 0) {
+            if (node.type == VAR and addressTable[sList[functionBase]].count(variable) == 0) {
                 auto size = addressTable[sList[functionBase]].size();
                 if (sList[functionBase] != GLOBAL) {
-                    size -= functionTable[sList[functionBase]]->func.parameters->size();
+                    size -= functionTable[GLOBAL][sList[functionBase]]->id.function.parameters->size();
                 }
-                addressTable[sList[functionBase]][variable] = size;
-            }
-        } else if (variableTable[s][variable] != UNSET and variableTable[s][variable] != type){
-            cerr << "Assigning a " << reverseTypeLookup[type] << " to a(n) " << reverseTypeLookup[variableTable[s][variable]] << " variable" << endl;
-            exit(-1);
+                if (!function) {
+                    addressTable[sList[functionBase]][variable] = size;
+                }
+                variableTable[sList.back()].insert(variable);
+                cout << "add variable " << variable << " to " << sList.back() << endl;
+            } //else if (node.type == ) // TODO
         }
     }
 }
+
 
 void defineFunctions() {
-    for (const auto& i : functionTable) {
-        if (functionLabel.count(i.first) != 0) {
-            int tempVariables = int(addressTable[i.first].size() - i.second->func.parameters->size());
-            printf("L%03d:\n", functionLabel[i.first]);        
-            if (tempVariables != 0) {
-                printf("\tpush\t%d\n", tempVariables);
-                printf("\tpush\tsp\n");   
-                printf("\tadd\n");
-                printf("\tpop\tsp\n");
-            }
-            ex(i.second->func.stmts, 998, 998, i.first);
+    for (const auto& FID : functionLabel) {
+        nodeType * func = functionTable[GLOBAL][FID.first];
+        func = functionTable[GLOBAL][func->id.function.origin];
+        int tempVariables = int(variableTable[FID.first].size() - func->id.function.parameters->size());
+        printf("L%03d:\n", functionLabel[FID.first]);
+        if (tempVariables != 0) {
+            printf("\tpush\t%d\n", tempVariables);
+            printf("\tpush\tsp\n");   
+            printf("\tadd\n");
+            printf("\tpop\tsp\n");
         }
+//        ex(func->id.function.stmts, 998, 998, FID);
     }
 }
 
-void preCheck(nodeType * const p, vector<scope>& sList, int functionBase, int mode) {
+void preCheck(nodeType * & p, vector<scope>& sList, int functionBase) {
     if (p == nullptr) {
         return;
     }
-    switch (p->type) {
-        case typeCon: {
+    switch (p->node) {
+        case nodeCon: {
             break;
-        } case typeId: {
-            if (mode == REFERENCE_CHECK) {
-                if (p->id.global) {
-                    if (variableTable[GLOBAL].count(p->id.i) == 0) {
-                        cerr << "Undefined reference to global variable: " << reverseLookup[p->id.i] << endl;
+        } case nodeId: {
+            idNodeType& ID = p->id;
+            auto VID = ID.i;
+            switch (ID.type) {
+                case FUNCTION: {
+                    if (sList.back() != GLOBAL) {
+                        cerr << "Function " << reverseLookup[VID] << " can only be defined in the global scope" << endl;
                         exit(-1);
                     }
-                    if (sList.back() == GLOBAL) {
-                        cerr << "Refer to a global variable: " << reverseLookup[p->id.i] << " in the global scope" << endl;
-                        exit(-1);
+                    if (variableTable.count(ID.i) == 0) {
+                        variableTable[ID.i] = set<int>();
+                        addressTable[ID.i] = map<id, int>();
+                        int size = 0;
+                        for (auto i = ID.function.parameters->begin(); i != ID.function.parameters->end(); ++i) {
+                            if (functionTable[GLOBAL].count((*i)->id.i) != 0) {
+                                cerr << "Redefinition of function: " << reverseLookup[(*i)->id.i] << endl;
+                                exit(-1);
+                            }
+                            variableTable[ID.i].insert((*i)->id.i);
+                            cout << "add variable " << (*i)->id.i << " to " << ID.i << endl;
+                            addressTable[ID.i][(*i)->id.i] = - 3 + (size++) - ID.function.parameters->size();
+                        }
+                        functionTable[GLOBAL][ID.i] = p;
+                        cout << "adding " << ID.i << " to " << GLOBAL << endl;
+                        variableTable[GLOBAL].insert(ID.i);
                     }
-                    p->valueType = variableTable[GLOBAL][p->id.i];
-                } else {
-                    auto s = getDefinitionScope(p->id.i, sList, functionBase);
-                    if ((s == -1) || (s == 0 and sList[functionBase] != 0)) {
-                        cerr << "Undefined reference to variable " << reverseLookup[p->id.i] << endl;
-                        exit(-1);
+                    break;
+                } case VAR: {
+                    if (ID.global) {
+                        if (variableTable[GLOBAL].count(ID.i) == 0) {
+                            cerr << "Undefined reference to global variable: " << reverseLookup[ID.i] << endl;
+                            exit(-1);
+                        }
+                        if (sList.back() == GLOBAL) {
+                            cerr << "Refer to a global variable: " << reverseLookup[ID.i] << " in the global scope" << endl;
+                            exit(-1);
+                        }
+                    } else {
+                            auto s = getDefinitionScope(ID.i, sList, functionBase);
+                        if ((s == -1) || (s == 0 and sList[functionBase] != 0)) {
+                            cerr << "Undefined reference to variable " << reverseLookup[p->id.i] << endl;
+                            exit(-1);
+                        }
                     }
-                    p->valueType = variableTable[s][p->id.i];
-                }
-            } else {
-                auto s = getDefinitionScope(p->id.i, sList, functionBase);
-                p->valueType = variableTable[s][p->id.i];
-            }
-            break;
-        } case typeFunc: {
-            funcNodeType function = p->func;
-            functionTable[function.i] = p;
-            for (auto i = function.parameters->begin(); i != function.parameters->end(); ++i) {
-                variableTable[function.i][(*i)->id.i] = UNSET;
-            }
-            break;
-        } case typeCall: {
-            functionID FID = p->call.i;
+                    break;
+                } case CALL: {
+                    auto FID = p->id.i;
+                    if (FID < 9) {
+                        if (ID.call.arguments->size() != 1) {
+                            cerr << reverseLookup[FID] << " expects 1 argument, got " << ID.call.arguments->size() << endl;
+                            exit(-1); 
+                        }
+                        auto first = ID.call.arguments->front();                    
+                        if (FID < 3) {
+                            if (first->node != nodeId) {
+                                cerr << reverseLookup[FID] << " got invalid argument" << endl;
+                                exit(-1);
+                            }
+                            preAssign(first->id, sList, functionBase);
+                        } else {
+                            preCheck(first, sList, functionBase);
+                        }
+                    } else {
+                        scope s = getDefinitionScope(FID, sList, functionBase);
+                        if (s == -1) {
+                            cerr << "Call to undefined function: " << reverseLookup[FID] << endl;
+                            exit(-1);
+                        }
+                        if (functionTable[s].count(FID) == 0) {
+                            cerr << "Call to undefined function: " << reverseLookup[FID] << endl;
+                            exit(-1);
+                        }
+                        auto target = functionTable[s][FID];
+                        if (target->id.i != target->id.function.origin and s == GLOBAL) {
+                            cerr << "Call to undefined function: " << reverseLookup[FID] << endl;
+                            exit(-1);
+                        }
+                        nodeType* temp = new nodeType(*target);
+                        cout << temp->id.function.arguments->size() << endl;
+                        if (temp->id.function.arguments->size() != temp->id.function.parameters->size()) {
+                            for (auto k = p->id.call.arguments->rbegin(); k != p->id.call.arguments->rend(); k++) {
+                                temp->id.function.arguments->push_front(*k);
+                            //    ID.call.arguments->push_back(nullptr);
+                            }
+                        }
+                        if (temp->id.function.parameters->size() < temp->id.function.arguments->size()) {
+                            cerr << reverseLookup[ID.i] << " expects " << temp->id.function.parameters->size() -  temp->id.function.arguments->size()
+                             +p->id.call.arguments->size() << " argument(s), got " << p->id.call.arguments->size() << endl;
+                            exit(-1);
+                        }
+                        for (auto & i : *ID.call.arguments) {
+                            preCheck(i, sList, functionBase);
+                        }
 
-            callNodeType callNode = p->call;
-            auto firstArgument = callNode.arguments->front();
-            if (FID < 9) {
-                if (callNode.arguments->size() != 1 or (FID < 3 and firstArgument->type != typeId)) {
-                    cerr << "Invalid call to " << reverseLookup[FID] << endl;
-                    exit(-1);
-                }
-                if (FID >= 3) {
-                    preCheck(firstArgument, sList, functionBase, mode);
-                    typeCheck(firstArgument, callNode);
-                } else {
-                    preAssign(firstArgument->id, requiredType[FID], sList, functionBase);
-                }
-            } else {
-                if (functionTable.count(FID) == 0) {
-                    cerr << "Call to undefined function: " << reverseLookup[FID] << endl;
-                    exit(-1);
-                }
-                funcNodeType target = functionTable[FID]->func;
-                for (const auto& i: *callNode.arguments) {
-                    preCheck(i, sList, functionBase, mode);
-                }
-                if (functionLabel.count(FID) == 0) {
-                    functionLabel[FID] = lbl++;
-                }
-                if (mode == REFERENCE_CHECK and target.i != sList[functionBase]) {
-                    variableTable[FID] = map<id, valueEnum>();
-                    addressTable[target.i] = map<id, int>();
-                }
-                int size = 0;
-                for (auto ai = callNode.arguments->begin(), pi = target.parameters->begin(); ai != callNode.arguments->end(); ++ai, ++pi) {
-                    variableTable[target.i][(*pi)->id.i] = (*ai)->valueType;
-                    addressTable[target.i][(*pi)->id.i] = - 3 + (size++) - target.parameters->size();
-                }
-                if (target.i != sList[functionBase]) {
-                    sList.push_back(FID);
-                    if (functionChecked.count(FID) != 0) {
-                        mode = VALUE_CHECK;
-                    }
-                    preCheck(target.stmts, sList, sList.size() - 1, mode);
-                    sList.pop_back();
-                    if (mode == REFERENCE_CHECK) {
-                        functionChecked.insert(FID);
+                        if (temp->id.function.parameters->size() == temp->id.function.arguments->size()) {
+                            if (functionLabel.count(temp->id.function.origin) == 0) {
+                                functionLabel[temp->id.function.origin] = lbl++;
+                            }
+                            if (temp->id.i != sList[functionBase] and functionChecked.count(temp->id.i) == 0) {
+                                sList.push_back(temp->id.function.origin);
+                                preCheck(temp->id.function.stmts, sList, sList.size() - 1);
+                                sList.pop_back();
+                                functionChecked.insert(temp->id.function.origin);
+                            }
+                        } else if (ID.call.arguments->size() != 0) {
+                            p = temp;
+                        } else {
+                            cerr << reverseLookup[ID.i] << " expects " << temp->id.function.parameters->size() - temp->id.function.arguments->size()
+                             << " argument(s), got " << ID.call.arguments->size() << endl;
+                            exit(-1);
+                        }
                     }
                 }
-                p->valueType = functionTable[FID]->valueType;
             }
             break;
-        } case typeOpr: {
+        } case nodeOpr: {
             switch (p->opr.oper) {
                 case BREAK: {
                     break;
@@ -247,58 +282,55 @@ void preCheck(nodeType * const p, vector<scope>& sList, int functionBase, int mo
                         cerr << "return occurs in the global scope" << endl;
                         exit(-1);
                     }
-                    nodeType * node = functionTable[sList[functionBase]];
+                    nodeType * node = functionTable[GLOBAL][sList[functionBase]];
                     if (p->opr.nops != 0) {
-                        preCheck(p->opr.op[0], sList, functionBase, mode);
+                        preCheck(p->opr.op[0], sList, functionBase);
                     }
-                    valueEnum t = p->opr.nops != 0 ? p->opr.op[0]->valueType : NONE;
-                    node->valueType = t;
                     break;
                 } case UMINUS: {
-                    preCheck(p->opr.op[0], sList, functionBase, mode);
-                    typeCheck(p->opr);
+                    preCheck(p->opr.op[0], sList, functionBase);
                     break;
                 } case FOR: {
                     sList.push_back(scopeCounter++);
-                    preCheck(p->opr.op[0], sList, functionBase, mode);
-                    conditionCheck(p->opr.op[0]);
-                    preCheck(p->opr.op[1], sList, functionBase, mode);
-                    preCheck(p->opr.op[3], sList, functionBase, mode);
-                    preCheck(p->opr.op[2], sList, functionBase, mode);
+                    preCheck(p->opr.op[0], sList, functionBase);
+   //                 conditionCheck(p->opr.op[0]);
+                    preCheck(p->opr.op[1], sList, functionBase);
+                    preCheck(p->opr.op[3], sList, functionBase);
+                    preCheck(p->opr.op[2], sList, functionBase);
                     sList.pop_back();
                     break;
                 } case WHILE: {
-                    preCheck(p->opr.op[0], sList, functionBase, mode);
-                    conditionCheck(p->opr.op[0]);
+                    preCheck(p->opr.op[0], sList, functionBase);
+  //                  conditionCheck(p->opr.op[0]);
                     ADDSCOPE(p->opr.op[1]);
                     break;
                 } case IF: {
-                    preCheck(p->opr.op[0], sList, functionBase, mode);
-                    conditionCheck(p->opr.op[0]);
+                    preCheck(p->opr.op[0], sList, functionBase);
+  //                  conditionCheck(p->opr.op[0]);
                     ADDSCOPE(p->opr.op[1]);
                     if (p->opr.nops > 2) {
                         ADDSCOPE(p->opr.op[2]);
                     }
                     break;
                 } case '=': {
-                    preCheck(p->opr.op[1], sList, functionBase, mode);
-                    preAssign(p->opr.op[0]->id, p->opr.op[1]->valueType, sList, functionBase);
-                } default: {
-                    if (p->opr.op[0] != nullptr and p->opr.op[1] != nullptr) {
-                        preCheck(p->opr.op[0], sList, functionBase, mode);
-                        preCheck(p->opr.op[1], sList, functionBase, mode);
-                        typeCheck(p->opr);
-                        auto left = p->opr.op[0]->valueType;
-                        auto right = p->opr.op[1]->valueType;
-                        if (applicable.count(p->opr.oper) > 0 and applicable[p->opr.oper].count({left, right})) {
-                            if (comparator.count(p->opr.oper) > 0) {
-                                p->valueType = BOOL;
-                            } else if (left != right) {
-                                p->valueType = INT;
-                            } else {
-                                p->valueType = left;
-                            }
+                    preCheck(p->opr.op[1], sList, functionBase);
+                    if (p->opr.op[1]->node == nodeCon or p->opr.op[1]->node == nodeOpr) {
+                        preAssign(p->opr.op[0]->id, sList, functionBase);
+                    } else {
+                        preAssign(p->opr.op[0]->id, sList, functionBase);
+                        scope s = getDefinitionScope(p->opr.op[1]->id.i, sList, functionBase);
+                        if (p->opr.op[1]->id.type == FUNCTION) {
+                            p->opr.op[0]->id.type = p->opr.op[1]->id.type;                        
+                            p->opr.op[0]->id.function = p->opr.op[1]->id.function;
+                            functionTable[sList.back()][p->opr.op[0]->id.i] = p->opr.op[0];
+                            cout << "adding " << p->opr.op[0]->id.i << " to " << sList.back() << endl;
                         }
+                    }
+                    break;
+                } default: {
+                    if (p->opr.nops == 2 and p->opr.op[0] != nullptr and p->opr.op[1] != nullptr) {
+                        preCheck(p->opr.op[0], sList, functionBase);
+                        preCheck(p->opr.op[1], sList, functionBase);
                     }
                     break;
                 }
@@ -322,7 +354,7 @@ void put(int i, functionID function, bool global=false) {
         printf("\tpop\tfp[%d]\n", addressTable[function][i]);
     }
 }
-
+/*
 int ex(nodeType *p, int blbl, int clbl, functionID function) {
     int lblx, lbly, lblz;
     if (!p) return 0;
@@ -402,7 +434,7 @@ int ex(nodeType *p, int blbl, int clbl, functionID function) {
                 case IF:
                     ex(p->opr.op[0], blbl, clbl, function);
                     if (p->opr.nops > 2) {
-                        /* if else */
+                        /* if else *\/
                         printf("\tj0\tL%03d\n", lblx = lbl++);
                         ex(p->opr.op[1], blbl, clbl, function);
                         printf("\tjmp\tL%03d\n", lbly = lbl++);
@@ -410,7 +442,7 @@ int ex(nodeType *p, int blbl, int clbl, functionID function) {
                         ex(p->opr.op[2], blbl, clbl, function);
                         printf("L%03d:\n", lbly);
                     } else {
-                        /* if */
+                        /* if *\/
                         printf("\tj0\tL%03d\n", lblx = lbl++);
                         ex(p->opr.op[1], blbl, clbl, function);
                         printf("L%03d:\n", lblx);
@@ -456,10 +488,14 @@ int ex(nodeType *p, int blbl, int clbl, functionID function) {
     }
     return 0;
 }
-
+*/
 void run(nodeType *p) {
-    variableTable[GLOBAL] = map<int, valueEnum>{};
-    reverseSymbolLookup = map<int, string>{{'+', "+"}, {'-', "-"}, {'*', "*"},
+    variableTable[GLOBAL] = set<id>{};
+    functionTable[GLOBAL] = map<functionID, nodeType*>();    
+    for (auto i = 0; i != 9; ++i) {
+        functionTable[GLOBAL][i] = nullptr;
+    }
+/*    reverseSymbolLookup = map<int, string>{{'+', "+"}, {'-', "-"}, {'*', "*"},
                                             {'/', "/"}, {'%', "%"}, {'<', "<"}, {'>', ">"}, {GE, ">="}, {LE, "<="},
                                             {EQ, "=="}, {NE, "!="}, {AND, "&&"}, {OR, "||"}, {UMINUS, "-"}};
     reverseTypeLookup = vector<string>{"unset", "None", "string", "character", "integer", "bool", "function"};
@@ -480,17 +516,20 @@ void run(nodeType *p) {
     }
     comparator = set<int>{GE, LE, '<', '>', NE, EQ};
     requiredType = {STR, CHAR, INT, STR, CHAR, INT, STR, CHAR, INT};
-    
+    */
     scopeCounter = 1;
     vector<scope> sList{GLOBAL};
-    preCheck(p, sList, GLOBAL, REFERENCE_CHECK);
+    for (auto i = 0; i != reverseLookup.size(); ++i) {
+        cout << i << reverseLookup[i] << endl;
+    }
+    preCheck(p, sList, GLOBAL);
     if (addressTable[GLOBAL].size() != 0) {
         printf("\tpush\tsp\n");
         printf("\tpush\t%d\n", int(addressTable[GLOBAL].size()));
         printf("\tadd\n");
         printf("\tpop\tsp\n");
     }
-    ex(p, 998, 998, GLOBAL);
+ //   ex(p, 998, 998, GLOBAL);
     printf("\tend\n");
     defineFunctions();
 }

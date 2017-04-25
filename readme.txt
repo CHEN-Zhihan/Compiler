@@ -1,3 +1,4 @@
+Name: CHEN Zhihan, UID: 3035142261
 Compilation: make
 
 Execution: ./c6 target > outfile
