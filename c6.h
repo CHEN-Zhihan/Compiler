@@ -57,8 +57,9 @@ struct conNodeType {
 };
 
 struct callType {
-    callType(list<nodeType*> * a):arguments(a) {;}
+    callType(list<nodeType*> * a, int o):arguments(a), origin(o) {;}
     list<nodeType *> * arguments;
+    int origin;
 };
 
 struct funcType {
@@ -139,7 +140,7 @@ struct idNodeType{
     idNodeType(int i, list<nodeType* > * p, nodeType* stmts, int origin): i(i), type(FUNCTION), function(funcType(p, stmts, origin)) {
         ;
     }
-    idNodeType(int i, list<nodeType* > * p):i(i), type(CALL), call(callType(p)) {
+    idNodeType(int i, list<nodeType* > * p, int o):i(i), type(CALL), call(callType(p, o)) {
         ;
     }
     union {

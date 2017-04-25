@@ -195,7 +195,6 @@ nodeType *func(const string * name, list<nodeType*> *parameters, nodeType *stmts
         cerr << "Redefinition of function: " << *name << endl;
         exit(-1);
     }
-    cout << parameters->size() << endl;
     nodeType * p = new nodeType(nodeId, idNodeType(i, parameters, stmts, i));
     if (p == nullptr) {
         cerr << "out of memory" << endl;
@@ -228,7 +227,7 @@ nodeType *call(const string * name, list<nodeType *> * arguments) {
     }
     i = nameMap[*name];
     callSet.insert(i);
-    nodeType * p = new nodeType(nodeId, idNodeType(i, arguments));
+    nodeType * p = new nodeType(nodeId, idNodeType(i, arguments, i));
     if (p == nullptr) {
         cerr << "out of memory" << endl;
     }

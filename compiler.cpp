@@ -39,6 +39,8 @@ constexpr scope GLOBAL = 0;
 constexpr int VALUE_CHECK = 1;
 constexpr int REFERENCE_CHECK = 2;
 
+#define DEBUG false
+
 extern vector<string> reverseLookup;/* maps a variable identifier to a name*/
 map<scope, map<functionID, nodeType *> > functionTable;
 static map<scope, set<id> > variableTable;
@@ -101,7 +103,6 @@ void typeCheck(const oprNodeType &p) {
 
 void preAssign(idNodeType& node, const vector<scope>& sList, int functionBase, bool function=false) {
     int variable = node.i;
-    cout << functionTable[GLOBAL].size() << endl;
     if (functionTable[GLOBAL].count(variable) != 0) {
         auto temp = functionTable[GLOBAL][variable];
         if (!temp or temp->id.function.origin == temp->id.i) {
@@ -126,7 +127,7 @@ void preAssign(idNodeType& node, const vector<scope>& sList, int functionBase, b
                     addressTable[sList[functionBase]][variable] = size;
                 }
                 variableTable[sList.back()].insert(variable);
-                cout << "add variable " << variable << " to " << sList.back() << endl;
+                if (DEBUG) cout << "add variable " << variable << " to " << sList.back() << endl;
             } //else if (node.type == ) // TODO
         }
     }
@@ -134,7 +135,13 @@ void preAssign(idNodeType& node, const vector<scope>& sList, int functionBase, b
 
 
 void defineFunctions() {
+    if (DEBUG) {
+        cout << functionLabel.size() << endl;
+    }
     for (const auto& FID : functionLabel) {
+        if (DEBUG) {
+            cout << FID.first << " " << FID.second << endl;
+        }
         nodeType * func = functionTable[GLOBAL][FID.first];
         func = functionTable[GLOBAL][func->id.function.origin];
         int tempVariables = int(variableTable[FID.first].size() - func->id.function.parameters->size());
@@ -145,7 +152,7 @@ void defineFunctions() {
             printf("\tadd\n");
             printf("\tpop\tsp\n");
         }
-//        ex(func->id.function.stmts, 998, 998, FID);
+        ex(func->id.function.stmts, 998, 998, FID.first);
     }
 }
 
@@ -175,11 +182,11 @@ void preCheck(nodeType * & p, vector<scope>& sList, int functionBase) {
                                 exit(-1);
                             }
                             variableTable[ID.i].insert((*i)->id.i);
-                            cout << "add variable " << (*i)->id.i << " to " << ID.i << endl;
+                            if (DEBUG) cout << "add variable " << (*i)->id.i << " to " << ID.i << endl;
                             addressTable[ID.i][(*i)->id.i] = - 3 + (size++) - ID.function.parameters->size();
                         }
                         functionTable[GLOBAL][ID.i] = p;
-                        cout << "adding " << ID.i << " to " << GLOBAL << endl;
+                        if (DEBUG) cout << "adding " << ID.i << " to " << GLOBAL << endl;
                         variableTable[GLOBAL].insert(ID.i);
                     }
                     break;
@@ -229,12 +236,11 @@ void preCheck(nodeType * & p, vector<scope>& sList, int functionBase) {
                             exit(-1);
                         }
                         auto target = functionTable[s][FID];
-                        if (target->id.i != target->id.function.origin and s == GLOBAL) {
+                        if (target->id.i != target->id.function.origin and s == GLOBAL and sList[functionBase] != GLOBAL) {
                             cerr << "Call to undefined function: " << reverseLookup[FID] << endl;
                             exit(-1);
                         }
                         nodeType* temp = new nodeType(*target);
-                        cout << temp->id.function.arguments->size() << endl;
                         if (temp->id.function.arguments->size() != temp->id.function.parameters->size()) {
                             for (auto k = p->id.call.arguments->rbegin(); k != p->id.call.arguments->rend(); k++) {
                                 temp->id.function.arguments->push_front(*k);
@@ -249,10 +255,13 @@ void preCheck(nodeType * & p, vector<scope>& sList, int functionBase) {
                         for (auto & i : *ID.call.arguments) {
                             preCheck(i, sList, functionBase);
                         }
-
+                        p->id.call.origin = temp->id.function.origin;
                         if (temp->id.function.parameters->size() == temp->id.function.arguments->size()) {
                             if (functionLabel.count(temp->id.function.origin) == 0) {
                                 functionLabel[temp->id.function.origin] = lbl++;
+                                if (DEBUG) {
+                                    cout << "adding " << temp->id.function.origin << " to functionLabel" << endl;
+                                }
                             }
                             if (temp->id.i != sList[functionBase] and functionChecked.count(temp->id.i) == 0) {
                                 sList.push_back(temp->id.function.origin);
@@ -260,6 +269,7 @@ void preCheck(nodeType * & p, vector<scope>& sList, int functionBase) {
                                 sList.pop_back();
                                 functionChecked.insert(temp->id.function.origin);
                             }
+                            p->id.call.arguments = temp->id.function.arguments;
                         } else if (ID.call.arguments->size() != 0) {
                             p = temp;
                         } else {
@@ -323,7 +333,7 @@ void preCheck(nodeType * & p, vector<scope>& sList, int functionBase) {
                             p->opr.op[0]->id.type = p->opr.op[1]->id.type;                        
                             p->opr.op[0]->id.function = p->opr.op[1]->id.function;
                             functionTable[sList.back()][p->opr.op[0]->id.i] = p->opr.op[0];
-                            cout << "adding " << p->opr.op[0]->id.i << " to " << sList.back() << endl;
+                            if (DEBUG)   cout << "adding " << p->opr.op[0]->id.i << " to " << sList.back() << endl;
                         }
                     }
                     break;
@@ -354,13 +364,13 @@ void put(int i, functionID function, bool global=false) {
         printf("\tpop\tfp[%d]\n", addressTable[function][i]);
     }
 }
-/*
+
 int ex(nodeType *p, int blbl, int clbl, functionID function) {
     int lblx, lbly, lblz;
     if (!p) return 0;
-    switch(p->type) {
-        case typeCon:
-            switch (p->valueType) {
+    switch(p->node) {
+        case nodeCon:
+            switch (p->con.conType) {
                 case INT: {
                     printf("\tpush\t%d\n", p->con.iValue);
                     break;
@@ -373,33 +383,32 @@ int ex(nodeType *p, int blbl, int clbl, functionID function) {
                 }
             }
             break;
-        case typeId: {
-            get(p->id.i, function, p->id.global);
-            break;
-        }
-        case typeFunc: {
-            break;
-        }
-        case typeCall: {
-            callNodeType& call = p->call;
-            if (call.i < 9) {
-                auto argument = call.arguments->front();
-                if (call.i < 3) {
-                    cout << "\t" << reverseLookup[call.i] << "\n";
-                    put(argument->id.i, function, argument->id.global);
+        case nodeId: {
+            int i = p->id.i;
+            if (p->id.type == VAR) {
+                get(i, function, p->id.global);
+            } else if (p->id.type == CALL) {
+                const auto& c = p->id.call;
+                if (i < 9) {
+                    auto argument = c.arguments->front();
+                    if (i < 3) {
+                        cout << "\t" << reverseLookup[i] << "\n";
+                        put(argument->id.i, function, argument->id.global);
+                    } else {
+                        ex(argument, blbl, clbl, function);
+                        cout << "\t" << reverseLookup[i] << "\n";
+                    }
                 } else {
-                    ex(argument, blbl, clbl, function);
-                    cout << "\t" << reverseLookup[call.i] << "\n";
+       //             auto s = getDefinitionScope(i, function, functionBase);
+
+                    for (const auto& argument : *(p->id.call.arguments)) {
+                        ex(argument, blbl, clbl, function);
+                    }
+                    printf("\tcall\tL%03d, %d\n", functionLabel[p->id.call.origin], (int)p->id.call.arguments->size());
                 }
-            } else {
-                for (const auto& i: *p->call.arguments) {
-                    ex(i, blbl, clbl, function);
-                }
-                printf("\tcall\tL%03d, %d\n", functionLabel[call.i], int(call.arguments->size()));
             }
             break;
-        }
-        case typeOpr:
+        } case nodeOpr:
             switch(p->opr.oper) {
                 case BREAK:
                     printf("\tjmp\tL%03d\n", blbl);
@@ -434,7 +443,7 @@ int ex(nodeType *p, int blbl, int clbl, functionID function) {
                 case IF:
                     ex(p->opr.op[0], blbl, clbl, function);
                     if (p->opr.nops > 2) {
-                        /* if else *\/
+                        /* if else */
                         printf("\tj0\tL%03d\n", lblx = lbl++);
                         ex(p->opr.op[1], blbl, clbl, function);
                         printf("\tjmp\tL%03d\n", lbly = lbl++);
@@ -442,7 +451,7 @@ int ex(nodeType *p, int blbl, int clbl, functionID function) {
                         ex(p->opr.op[2], blbl, clbl, function);
                         printf("L%03d:\n", lbly);
                     } else {
-                        /* if *\/
+                        /* if */
                         printf("\tj0\tL%03d\n", lblx = lbl++);
                         ex(p->opr.op[1], blbl, clbl, function);
                         printf("L%03d:\n", lblx);
@@ -459,7 +468,9 @@ int ex(nodeType *p, int blbl, int clbl, functionID function) {
                 }
                 case '=': {
                     ex(p->opr.op[1], blbl, clbl, function);
-                    put(p->opr.op[0]->id.i, function, p->opr.op[0]->id.global);
+                    if (p->opr.op[1]->node != nodeId or p->opr.op[1]->id.type != FUNCTION) {
+                        put(p->opr.op[0]->id.i, function, p->opr.op[0]->id.global);
+                    }
                     break;
                 }
                 case UMINUS:
@@ -467,7 +478,13 @@ int ex(nodeType *p, int blbl, int clbl, functionID function) {
                     printf("\tneg\n");
                     break;
                 default:
+                    if (p->opr.nops == 0) {
+                        return 0;
+                    }
                     ex(p->opr.op[0], blbl, clbl, function);
+                    if (p->opr.nops == 1) {
+                        return 0;
+                    }
                     ex(p->opr.op[1], blbl, clbl, function);
                     switch(p->opr.oper) {
                         case '+':   printf("\tadd\n"); break;
@@ -488,7 +505,7 @@ int ex(nodeType *p, int blbl, int clbl, functionID function) {
     }
     return 0;
 }
-*/
+//*/
 void run(nodeType *p) {
     variableTable[GLOBAL] = set<id>{};
     functionTable[GLOBAL] = map<functionID, nodeType*>();    
@@ -519,9 +536,12 @@ void run(nodeType *p) {
     */
     scopeCounter = 1;
     vector<scope> sList{GLOBAL};
-    for (auto i = 0; i != reverseLookup.size(); ++i) {
-        cout << i << reverseLookup[i] << endl;
+    if (DEBUG) {
+        for (auto i = 0; i != reverseLookup.size(); ++i) {
+            cerr << i << reverseLookup[i] << endl;
+        }
     }
+
     preCheck(p, sList, GLOBAL);
     if (addressTable[GLOBAL].size() != 0) {
         printf("\tpush\tsp\n");
@@ -529,7 +549,7 @@ void run(nodeType *p) {
         printf("\tadd\n");
         printf("\tpop\tsp\n");
     }
- //   ex(p, 998, 998, GLOBAL);
+    ex(p, 998, 998, GLOBAL);
     printf("\tend\n");
     defineFunctions();
 }
