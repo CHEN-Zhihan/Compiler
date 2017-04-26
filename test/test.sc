@@ -1,12 +1,11 @@
-// function that initialize global variable
-def finit() {
-  @a = 10;
+def x(a) {
+    puti(a);
+    return a + 1;
 }
 
-def fout() {
-  puti(@a);
+def y(b, a) {
+    z = x(b + a);
+    return z;
 }
 
-finit();
-fout();
-
+puti(y(10, 30)); 

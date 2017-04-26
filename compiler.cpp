@@ -18,41 +18,28 @@ using std::set;
 #include "Node.h"
 #include "parser.tab.h"
 
-int lbl;
-
-
-using id = int;
 using scope = int;
-using functionID = int;
-using operatorID = int;
 
-scope GLOBAL = 0;
-constexpr int VALUE_CHECK = 1;
-constexpr int REFERENCE_CHECK = 2;
+extern int GLOBAL;
 
-#define DEBUG true
+#define DEBUG false
 
 extern vector<string> reverseLookup;/* maps a variable identifier to a name*/
-map<functionID,  const FunctionNode* >functionTable;
-map<int, set<int> > variableTable;
-map<int, string> operatorInstruction;
+map<int,  const FunctionNode* >functionTable; /* maps a function ID to the node it corresponds to*/
+map<scope, set<int> > variableTable; /*maps a scope to the set of visible variables*/
+map<int, string> operatorInstruction; /*maps an operator to the instruction to be printed*/
+map<int, int> functionLabel; /*maps a function id to the label number*/
+map<int, map<int, int> > addressTable; /*maps a function to an address table it holds for local/global variables*/
+
+
 /*
-static set<operatorID> comparator;/*determine whether an operator is a comparator. If yes, the resulting type should be BOOL
-static map<operatorID, string> reverseSymbolLookup; /*maps an operator to its name
-static map<id, set<pair<valueEnum, valueEnum> > > applicable; /*maps an operator to the set of operands it can perform on.
-static vector<string> reverseTypeLookup; /*maps an valueEnum value to its name.
-static vector<valueEnum> requiredType; /*maps a variable identifier to the type of arguments. Used for built-in functions.*/
-
-scope scopeCounter;
-map<functionID, int> functionLabel;
-map<functionID, map<id, int> > addressTable;
-
-
+define all functions called at the end of code.
+*/
 void defineFunctions() {
     for (const auto& FID : functionLabel) {
         auto func = functionTable[FID.first];
         int tempVariables = int(variableTable[FID.first].size() - func->getNumParameters());
-        printf("L%03d:\n", functionLabel[FID.first]);
+        printf("L%03d:\n", FID.second);
         if (tempVariables != 0) {
             printf("\tpush\t%d\n", tempVariables);
             printf("\tpush\tsp\n");   
@@ -71,12 +58,12 @@ void run(shared_ptr<Node> p) {
                                             {'>', "compGT"}, {GE, "compGE"}, {LE, "compLE"},
                                             {NE, "compNE"}, {EQ, "compEQ"}, {AND, "and"},
                                             {OR, "or"}};
-    variableTable[GLOBAL] = set<id>{};
+    variableTable[GLOBAL] = set<int>{};
     functionTable = map<int, const FunctionNode* >();    
     for (auto i = 0; i != 9; ++i) {
         variableTable[GLOBAL].insert(i);
+        functionTable[i] = nullptr;
     }
-    scopeCounter = 1;
     vector<scope> sList{GLOBAL};
     #if DEBUG
         for (auto i = 0; i != reverseLookup.size(); ++i) {

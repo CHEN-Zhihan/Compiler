@@ -16,25 +16,7 @@ def factorial(n) {
     return n * factorial(n - 1);
 }
 
-2. support of function overload, example:
-
-def a(x) {
-    puti(x);
-}
-
-def a(x, y) {
-    for (i = 0; i != y; i = i + 1;) {
-        puti(x);
-    }
-}
-
-a(5) // call the first function.
-a(5, 10) // call the second function.
-
-3. Result of addition and subtraction between char and int will be cast into char.
-Comparison between string is not allowed. Comparison between different types is not allowed.
-
-4. Scope is used, example:
+2. Scope and reference check is used, example:
 a = 1;
 c = 5;
 if (a == 1) {

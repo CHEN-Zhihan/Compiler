@@ -23,15 +23,16 @@ using std::dynamic_pointer_cast;    using std::make_shared;
     node->check(sList, functionBase);\
     sList.pop_back();
 
-extern int lbl;
+static int lbl = 0;
+static int scopeCounter = 1;
+int GLOBAL = 0;
+
 extern map<int, string> operatorInstruction;
 extern map<int, int> functionLabel;
 extern map<int, map<int, int> > addressTable;
 extern map<int, const FunctionNode* > functionTable;
 extern map<int, set<int> > variableTable;
-extern int GLOBAL;
 extern vector<string> reverseLookup;
-extern int scopeCounter;
 
 StrNode::StrNode(const string& v):value(v) {;}
 void StrNode::ex(int bl, int cl, int func) const {
@@ -312,6 +313,10 @@ void VarNode::assign(vector<int> & sList, int functionBase) const {
         exit(-1);
     }
     if (global) {
+        if (sList[functionBase] == GLOBAL) {
+            cerr << "Refer to global variable " << reverseLookup[i] << " in the global scope" << endl;
+            exit(-1);
+        }
         if (variableTable[GLOBAL].count(i) == 0) {
             auto size = addressTable[GLOBAL].size();
             variableTable[GLOBAL].insert(i);
@@ -319,12 +324,14 @@ void VarNode::assign(vector<int> & sList, int functionBase) const {
         }
     } else {
         int s = getDefinitionScope(sList, functionBase);
-        if (s == -1) { // and addressTable[sList[functionBase]].count(i) == 0) {
-            auto size = addressTable[sList[functionBase]].size();
-            if (sList[functionBase] != GLOBAL) {
-                size -= functionTable[sList[functionBase]]->getNumParameters();
+        if (s == -1) {
+            if (addressTable[sList[functionBase]].count(i) == 0) {
+                auto size = addressTable[sList[functionBase]].size();
+                if (sList[functionBase] != GLOBAL) {
+                    size -= functionTable[sList[functionBase]]->getNumParameters();
+                }
+                addressTable[sList[functionBase]][i] = size;
             }
-            addressTable[sList[functionBase]][i] = size;
             variableTable[sList.back()].insert(i);
             #if DEBUG
                 cerr << "add variable " << i << " to " << sList.back() << endl;
@@ -348,7 +355,7 @@ void VarNode::check(vector<int>& sList, int functionBase) const {
             cerr << "Undefined reference to global variable: " << reverseLookup[i] << endl;
             exit(-1);
         }
-        if (sList.back() == GLOBAL) {
+        if (sList[functionBase] == GLOBAL) {
             cerr << "Refer to a global variable: " << reverseLookup[i] << " in the global scope" << endl;
             exit(-1);
         }
