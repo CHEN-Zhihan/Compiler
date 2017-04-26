@@ -8,7 +8,7 @@ using std::string;
 using std::vector;
 
 #include <memory>
-using std::shared_ptr;  using std::enable_shared_from_this;
+using std::shared_ptr;
 
 #include <list>
 using std::list;

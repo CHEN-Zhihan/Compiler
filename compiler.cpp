@@ -10,7 +10,7 @@ using std::list;
 using std::vector;
 
 #include <map>
-using std::map; using std::pair;
+using std::map;
 
 #include <set>
 using std::set;
