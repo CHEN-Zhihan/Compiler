@@ -10,6 +10,9 @@ using std::string;
 #include <vector>
 using std::vector;
 
+#include <memory>
+using std::shared_ptr;
+
 enum nodeEnum{nodeCon, nodeId, nodeOpr};
 
 enum typeEnum{
@@ -83,13 +86,8 @@ struct funcType {
         origin = another.origin;
     }
     funcType& operator=(const funcType& another) {
-  /*      if (this->parameters != nullptr) {
-            delete this->parameters;
-            delete this->arguments;
-            this->parameters = nullptr;
-            this->arguments = nullptr;
-        }*/
-
+        delete this->parameters;
+        delete this->arguments;
         this->parameters = another.parameters;
         this->stmts = another.stmts;
         this->arguments = new list<nodeType*>();
@@ -100,7 +98,7 @@ struct funcType {
         return *this;
     }
     int origin;
-    const list<nodeType *> * parameters;
+    list<nodeType *> * parameters;
     list<nodeType *> * arguments;
     nodeType * stmts;
 };

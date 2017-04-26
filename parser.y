@@ -34,6 +34,7 @@ list<nodeType *> * buildList();
 list<nodeType *> * buildList(nodeType *);
 list<nodeType *> * buildList(nodeType *, list<nodeType *> *);
 void run(nodeType* p);
+void freeNode(nodeType*p);
 int yylex(void);
 void yyerror(char *s);
 static map<string, int> nameMap;
@@ -77,7 +78,7 @@ static int nameCounter;
 program:
         stmt_list END                          {
                                                     run($1);
-                                     //               freeNode($1);
+                                                    freeNode($1);
                                                     exit(0);
                                                 }
         ;
@@ -242,6 +243,8 @@ void init() {
         reverseLookup.push_back(i);
     }
 }
+
+
 
 int main(int argc, const char *argv[]) {
     yydebug = 0;
