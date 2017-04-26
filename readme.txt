@@ -16,7 +16,7 @@ def factorial(n) {
     return n * factorial(n - 1);
 }
 
-2. Scope and reference check is used, example:
+2. Scope and reference check are adopted, example:
 a = 1;
 c = 5;
 if (a == 1) {
