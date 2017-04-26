@@ -8,7 +8,7 @@ using std::string;
 using std::vector;
 
 #include <memory>
-using std::shared_ptr;
+using std::shared_ptr;  using std::enable_shared_from_this;
 
 #include <list>
 using std::list;
@@ -16,14 +16,14 @@ using std::list;
 class Node {
 public:
     Node()=default;
-    virtual void ex(int, int, int) = 0;
-    virtual void check(vector<int>&, int) = 0;
+    virtual void ex(int, int, int) const = 0;
+    virtual void check(vector<int>&, int) const = 0;
 };
 
 class ConNode: public Node {
 public:
-    virtual void ex(int, int, int) = 0;
-    virtual void check(vector<int>&, int) {
+    virtual void ex(int, int, int) const = 0;
+    void check(vector<int>&, int) const{
         ;
     }
 };
@@ -31,7 +31,7 @@ public:
 class StrNode:public ConNode {
 public:
     StrNode(const string&);
-    void ex(int, int, int);
+    void ex(int, int, int) const;
 private:
     const string value;
 };
@@ -39,7 +39,7 @@ private:
 class CharNode:public ConNode {
 public:
     CharNode(const string&);
-    void ex(int, int, int);
+    void ex(int, int, int) const;
 private:
     const string value;
 };
@@ -47,7 +47,7 @@ private:
 class IntNode:public ConNode {
 public:
     IntNode(const int&);
-    void ex(int, int, int);
+    void ex(int, int, int) const;
 private:
     const int value;
 };
@@ -55,8 +55,8 @@ private:
 class OprNode:public Node {
 public:
     OprNode(int, const vector<shared_ptr<Node>>&);
-    void ex(int, int, int);
-    void check(vector<int>&, int);
+    void ex(int, int, int) const;
+    void check(vector<int>&, int) const;
 private:
     int oper;
     vector<shared_ptr<Node>> op;
@@ -65,42 +65,48 @@ private:
 class IDNode:public Node {
 public:
     IDNode(int);
-
+    int getID() const;
 protected:
     int i;
+};
+class VarNode: public IDNode {
+public:
+    VarNode(int, bool);
+    void ex(int, int, int) const;
+    void check(vector<int>&, int) const;
+    void assign(vector<int>&, int) const;
+    void pop(int) const;
+private:
+    bool global;
+    int getDefinitionScope(const vector<int>&, int) const;    
+    void push(int) const;
+
 };
 
 class FunctionNode: public IDNode {
 public:
-    FunctionNode(int, const list<shared_ptr<Node> >, const shared_ptr<Node>&);
-    void ex(int, int, int);
-    void check(vector<int>&, int);
+    FunctionNode(int, const list<shared_ptr<VarNode> >, const shared_ptr<Node>&);
+    void ex(int, int, int) const;
+    void check(vector<int>&, int) const;
+    size_t getNumParameters() const;
+    void checkStmt(vector<int>&, int) const;
+    void exStmt(int, int, int) const;
 private:
     int origin;
-    list<shared_ptr<Node> > parameters;
+    list<shared_ptr<VarNode> > parameters;
     shared_ptr<Node> stmts;
 };
 
 class CallNode: public IDNode {
 public:
     CallNode(int, const list<shared_ptr<Node>>);
-    void ex(int, int, int);
-    void check(vector<int>&, int);
+    void ex(int, int, int) const;
+    void check(vector<int>&, int) const;
 private:
     int origin;
     list<shared_ptr<Node> > arguments;
 };
 
-class VarNode: public IDNode {
-public:
-    VarNode(int, bool);
-    void ex(int, int, int);
-    void check(vector<int>&, int);
-    void push(int);
-    void pop(int);
-    void assign(vector<int>&, int);
-private:
-    bool global;
-};
+
 
 #endif

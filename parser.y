@@ -21,6 +21,7 @@ using std::set;
 
 #include <memory>
 using std::shared_ptr;  using std::make_shared;
+using std::dynamic_pointer_cast;
 
 #include "Node.h"
 
@@ -40,7 +41,6 @@ int yylex(void);
 void yyerror(char *s);
 static map<string, int> nameMap;
 set<int> functionSet;
-map<int, set<int> > variableTable;
 set<int> callSet;
 vector<string> reverseLookup;
 static int nameCounter;
@@ -200,7 +200,11 @@ Node * func(const string * name, list<shared_ptr<Node> > * parameters, Node * st
         cerr << "Redefinition of function: " << *name << endl;
         exit(-1);
     }
-    auto p = new FunctionNode(i, *parameters, shared_ptr<Node>(stmts));
+    auto varPar = list<shared_ptr<VarNode> >();
+    for (const auto & i : *parameters) {
+        varPar.push_back(dynamic_pointer_cast<VarNode>(i));
+    }
+    auto p = new FunctionNode(i, varPar, shared_ptr<Node>(stmts));
     delete name;
     delete parameters;
     return p;

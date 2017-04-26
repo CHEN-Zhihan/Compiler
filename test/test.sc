@@ -1,4 +1,12 @@
-geti(i);
-while (i != 10) {
-    geti(i);
+// function that initialize global variable
+def finit() {
+  @a = 10;
 }
+
+def fout() {
+  puti(@a);
+}
+
+finit();
+fout();
+
