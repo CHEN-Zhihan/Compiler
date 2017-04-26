@@ -18,23 +18,24 @@ using std::vector;
 #include <set>
 using std::set;
 
-#include "c6.h"
 
-#define v new vector<nodeType*>
+#include <memory>
+using std::shared_ptr;  using std::make_shared;
+
+#include "Node.h"
 
 /* prototypes */
-nodeType *opr(int, int, nodeType* *);
-nodeType *con(int value);
-nodeType *con(const string * value);
-nodeType *conChar(const string * value);
-nodeType *id(const string *, bool isGlobal=false);
-nodeType *call(const string *, list<nodeType *> *);
-nodeType *func(const string *, list<nodeType*> *, nodeType *);
-list<nodeType *> * buildList();
-list<nodeType *> * buildList(nodeType *);
-list<nodeType *> * buildList(nodeType *, list<nodeType *> *);
-void run(nodeType* p);
-void freeNode(nodeType*p);
+Node* opr(int, const vector<Node*> &);
+Node* con(int value);
+Node* con(const string * value);
+Node* conChar(const string * value);
+Node* id(const string *, bool isGlobal=false);
+Node* call(const string *, list<shared_ptr<Node> >*);
+Node* func(const string *, list<shared_ptr<Node> >*, Node*);
+list<shared_ptr<Node> > * buildList();
+list<shared_ptr<Node> > * buildList(shared_ptr<Node>);
+void buildList(shared_ptr<Node>, list<shared_ptr<Node> > *);
+void run(shared_ptr<Node> p);
 int yylex(void);
 void yyerror(char *s);
 static map<string, int> nameMap;
@@ -50,8 +51,8 @@ static int nameCounter;
     const string * cValue;
     const string * sValue;
     const string * variable;
-    nodeType *nPtr;             /* node pointer */
-    list<nodeType *> *lists;
+    Node * nPtr;             /* node pointer */
+    list<shared_ptr<Node> > * lists;
 };
 
 %token <iValue> INTEGER
@@ -77,37 +78,36 @@ static int nameCounter;
 
 program:
         stmt_list END                          {
-                                                    run($1);
-                                                    freeNode($1);
+                                                    run(shared_ptr<Node>($1));
                                                     exit(0);
                                                 }
         ;
 
 parameterList:
-        VARIABLE                            { $$ = buildList(id($1));}
-        | VARIABLE ',' parameterList        { $$ = buildList(id($1), $3);}
+        VARIABLE                            { $$ = buildList(shared_ptr<Node>(id($1)));}
+        | VARIABLE ',' parameterList        { buildList(shared_ptr<Node>(id($1)), $3); $$ = $3;}
         |                                   { $$ = buildList();}
         ;
 
 argumentList:
-        expr                                  { $$ = buildList($1);}
-        | expr ',' argumentList               { $$ = buildList($1, $3);}
+        expr                                  { $$ = buildList(shared_ptr<Node>($1));}
+        | expr ',' argumentList               { buildList(shared_ptr<Node>($1), $3); $$ = $3;}
         |                                     { $$ = buildList();}
         ;
 
 stmt:
-          ';'                                 { $$ = opr(';', 0, nullptr); }
+          ';'                                 { $$ = opr(';', {}); }
         | expr ';'                            { $$ = $1;}
-        | variable '=' expr ';'                   { $$ = opr('=', 2, new nodeType*[2]{$1, $3});}
-        | FOR '(' stmt stmt stmt ')' stmt     { $$ = opr(FOR, 4, new nodeType*[4]{$3, $4, $5, $7});}
-        | WHILE '(' expr ')' stmt             { $$ = opr(WHILE, 2, new nodeType*[2]{$3, $5});}
-        | IF '(' expr ')' stmt %prec IFX      {  $$ = opr(IF, 2, new nodeType*[2]{$3, $5});}
-        | IF '(' expr ')' stmt ELSE stmt      { $$ = opr(IF, 3, new nodeType*[3]{$3, $5, $7});}
+        | variable '=' expr ';'                   { $$ = opr('=', {$1, $3});}
+        | FOR '(' stmt stmt stmt ')' stmt     { $$ = opr(FOR, {$3, $4, $5, $7});}
+        | WHILE '(' expr ')' stmt             { $$ = opr(WHILE, {$3, $5});}
+        | IF '(' expr ')' stmt %prec IFX      {  $$ = opr(IF, {$3, $5});}
+        | IF '(' expr ')' stmt ELSE stmt      { $$ = opr(IF, {$3, $5, $7});}
         | '{' stmt_list '}'                   { $$ = $2;}
-        | BREAK                               { $$ = opr(BREAK, 0, nullptr);}
-        | CONTINUE                            { $$ = opr(CONTINUE, 0, nullptr);}
-        | RETURN expr ';'                     { $$ = opr(RETURN, 1, new nodeType*[1]{$2});}
-        | RETURN ';'                          { $$ = opr(RETURN, 0, nullptr);}  
+        | BREAK                               { $$ = opr(BREAK, {});}
+        | CONTINUE                            { $$ = opr(CONTINUE, {});}
+        | RETURN expr ';'                     { $$ = opr(RETURN, {$2});}
+        | RETURN ';'                          { $$ = opr(RETURN, {});}  
         | DEF VARIABLE '(' parameterList ')' '{' stmt_list '}'    { $$ = func($2, $4, $7);}
         ;
 
@@ -122,25 +122,25 @@ variable:
 
 stmt_list:
           stmt                  { $$ = $1;}
-        | stmt_list stmt        { $$ = opr(';', 2, new nodeType*[2]{$1, $2});}
+        | stmt_list stmt        { $$ = opr(';', {$1, $2});}
         ;
 expr:
         constant                   {$$ = $1;}
         | variable                  { $$ = $1;}
-        | '-' expr %prec UMINUS { $$ = opr(UMINUS, 1, new nodeType*[1]{$2}); }
-        | expr '+' expr         { $$ = opr('+', 2, new nodeType*[2]{$1, $3}); }
-        | expr '-' expr         { $$ = opr('-', 2, new nodeType*[2]{$1, $3}); }
-        | expr '*' expr         { $$ = opr('*', 2, new nodeType*[2]{$1, $3}); }
-        | expr '%' expr         { $$ = opr('%', 2, new nodeType*[2]{$1, $3}); }
-        | expr '/' expr         { $$ = opr('/', 2, new nodeType*[2]{$1, $3}); }
-        | expr '<' expr         { $$ = opr('<', 2, new nodeType*[2]{$1, $3}); }
-        | expr '>' expr         { $$ = opr('>', 2, new nodeType*[2]{$1, $3}); }
-        | expr GE expr          { $$ = opr(GE, 2, new nodeType*[2]{$1, $3}); }
-        | expr LE expr          { $$ = opr(LE, 2, new nodeType*[2]{$1, $3}); }
-        | expr NE expr          { $$ = opr(NE, 2, new nodeType*[2]{$1, $3}); }
-        | expr EQ expr          { $$ = opr(EQ, 2, new nodeType*[2]{$1, $3}); }
-        | expr AND expr            { $$ = opr(AND, 2, new nodeType*[2]{$1, $3}); }
-        | expr OR expr            { $$ = opr(OR, 2, new nodeType*[2]{$1, $3}); }
+        | '-' expr %prec UMINUS { $$ = opr(UMINUS, {$2}); }
+        | expr '+' expr         { $$ = opr('+', {$1, $3}); }
+        | expr '-' expr         { $$ = opr('-', {$1, $3}); }
+        | expr '*' expr         { $$ = opr('*', {$1, $3}); }
+        | expr '%' expr         { $$ = opr('%', {$1, $3}); }
+        | expr '/' expr         { $$ = opr('/', {$1, $3}); }
+        | expr '<' expr         { $$ = opr('<', {$1, $3}); }
+        | expr '>' expr         { $$ = opr('>', {$1, $3}); }
+        | expr GE expr          { $$ = opr(GE, {$1, $3}); }
+        | expr LE expr          { $$ = opr(LE, {$1, $3}); }
+        | expr NE expr          { $$ = opr(NE, {$1, $3}); }
+        | expr EQ expr          { $$ = opr(EQ, {$1, $3}); }
+        | expr AND expr            { $$ = opr(AND, {$1, $3}); }
+        | expr OR expr            { $$ = opr(OR, {$1, $3}); }
         | '(' expr ')'          { $$ = $2; }
         | VARIABLE '(' argumentList ')' {$$ = call($1, $3);}
         ;
@@ -151,41 +151,45 @@ expr:
 
 
 
-nodeType *con(int value) {
-    return new nodeType(nodeCon, conNodeType(INT, value));
+Node * con(int value) {
+    return new IntNode(value);
 }
 
-nodeType *conChar(const string * value) {
-    return new nodeType(nodeCon, conNodeType(CHAR, value, false));
+Node * conChar(const string * value) {
+    auto p = new CharNode(*value);
+    delete value;
+    return p;
 }
 
-nodeType *con(const string * value) {
-    return new nodeType(nodeCon, conNodeType(STR, value, true));
+Node * con(const string * value) {
+    auto p = new StrNode(*value);
+    delete value;
+    return p;
 }
 
-nodeType *opr(int oper, int nop, nodeType** op) {
-    nodeType * p = new nodeType(nodeOpr, oprNodeType(oper, nop, op));
-    if (p == nullptr) {
-        cerr << "out of memory" << endl;
+Node * opr(int oper, const vector<Node *>& op) {
+    auto v = vector<shared_ptr<Node> >();
+    for (const auto i: op) {
+        v.push_back(shared_ptr<Node>(i));
     }
-    return p;
+    return new OprNode(oper, v);
 }
 
 
-list<nodeType *> * buildList() {
-    auto p = new list<nodeType*>();
-    return p;
+list<shared_ptr<Node> > * buildList() {
+    return new list<shared_ptr<Node> >();
 }
 
-list<nodeType *> * buildList(nodeType * p) {
-    return new list<nodeType*>{p};
-}
-list<nodeType *> * buildList(nodeType *n , list<nodeType *> *l) {
-    l->push_front(n);
+list<shared_ptr<Node> > * buildList(shared_ptr<Node> p) {
+    auto l = new list<shared_ptr<Node> >();
+    l->push_back(p);
     return l;
 }
+void buildList(shared_ptr<Node>n , list<shared_ptr<Node> > * l) {
+    l->push_front(n);
+}
 
-nodeType *func(const string * name, list<nodeType*> *parameters, nodeType *stmts) {
+Node * func(const string * name, list<shared_ptr<Node> > * parameters, Node * stmts) {
     int i;
     if (nameMap.count(*name) == 0) {
         nameMap[*name] = nameCounter++;
@@ -196,31 +200,24 @@ nodeType *func(const string * name, list<nodeType*> *parameters, nodeType *stmts
         cerr << "Redefinition of function: " << *name << endl;
         exit(-1);
     }
-    nodeType * p = new nodeType(nodeId, idNodeType(i, parameters, stmts, i));
-    if (p == nullptr) {
-        cerr << "out of memory" << endl;
-    }
+    auto p = new FunctionNode(i, *parameters, shared_ptr<Node>(stmts));
     delete name;
-
+    delete parameters;
     return p;
 }
 
-nodeType *id(const string * name, bool isGlobal) {
+Node * id(const string * name, bool isGlobal) {
     int i;
     if (nameMap.count(*name) == 0) {
         nameMap[*name] = nameCounter++;
         reverseLookup.push_back(*name);
     }
     i = nameMap[*name];
-    nodeType * p = new nodeType(nodeId, idNodeType(i, isGlobal));
-    if (p == nullptr) {
-        cerr << "out of memory" << endl;
-    }
     delete name;
-    return p;
+    return new VarNode(i, isGlobal);
 }
 
-nodeType *call(const string * name, list<nodeType *> * arguments) {
+Node * call(const string * name, list<shared_ptr<Node> > * arguments) {
     int i;
     if (nameMap.count(*name) == 0) {
         nameMap[*name] = nameCounter++;
@@ -228,16 +225,14 @@ nodeType *call(const string * name, list<nodeType *> * arguments) {
     }
     i = nameMap[*name];
     callSet.insert(i);
-    nodeType * p = new nodeType(nodeId, idNodeType(i, arguments, i));
-    if (p == nullptr) {
-        cerr << "out of memory" << endl;
-    }
+    auto p = new CallNode(i, *arguments);
     delete name;
+    delete arguments;
     return p;
 }
 
 void init() {
-    for (auto & i: {"gets", "getc", "geti", "puts", "putc", "puti", "puts_", "putc_", "puti_"}) {
+    for (auto i: {"gets", "getc", "geti", "puts", "putc", "puti", "puts_", "putc_", "puti_"}) {
         nameMap[i] = nameCounter++;
         functionSet.insert(nameCounter - 1);
         reverseLookup.push_back(i);

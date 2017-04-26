@@ -1,2 +1,4 @@
-a = 1;
-puti(a);
+geti(i);
+while (i != 10) {
+    geti(i);
+}

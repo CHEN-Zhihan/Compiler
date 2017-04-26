@@ -15,10 +15,10 @@ using std::map; using std::pair;
 #include <set>
 using std::set;
 
-#include "c6.h"
+#include "Node.h"
 #include "parser.tab.h"
 
-static int lbl;
+int lbl;
 
 
 using id = int;
@@ -35,15 +35,16 @@ using operatorID = int;
 
 
 
-constexpr scope GLOBAL = 0;
+scope GLOBAL = 0;
 constexpr int VALUE_CHECK = 1;
 constexpr int REFERENCE_CHECK = 2;
 
 #define DEBUG true
 
-extern vector<string> reverseLookup;/* maps a variable identifier to a name*/
-map<scope, map<functionID, nodeType *> > functionTable;
-static map<scope, set<id> > variableTable;
+//extern vector<string> reverseLookup;/* maps a variable identifier to a name*/
+map<scope, map<functionID,  shared_ptr<Node> > > functionTable;
+map<scope, set<id> > variableTable;
+map<int, string> operatorInstruction;
 /*
 static set<operatorID> comparator;/*determine whether an operator is a comparator. If yes, the resulting type should be BOOL
 static map<operatorID, string> reverseSymbolLookup; /*maps an operator to its name
@@ -53,9 +54,9 @@ static vector<valueEnum> requiredType; /*maps a variable identifier to the type 
 
 static scope scopeCounter;
 static set<functionID> functionChecked;
-static map<functionID, int> functionLabel;
-static map<functionID, map<id, int> > addressTable;
-
+map<functionID, int> functionLabel;
+map<functionID, map<id, int> > addressTable;
+/*
 int ex(nodeType*, int, int, functionID);
 
 scope getDefinitionScope(id target, const vector<scope>& sList, int functionBase) {
@@ -311,182 +312,36 @@ void preCheck(nodeType * & p, vector<scope>& sList, int functionBase) {
         }
     }
 }
-
-void get(int i, functionID function, bool global=false) {
-    if (global or function == GLOBAL) {
-        printf("\tpush\tsb[%d]\n", addressTable[GLOBAL][i]);
-    } else {
-        printf("\tpush\tfp[%d]\n", addressTable[function][i]);
-    }
-}
-
-void put(int i, functionID function, bool global=false) {
-    if (global or function == GLOBAL) {
-        printf("\tpop\tsb[%d]\n", addressTable[GLOBAL][i]);
-    } else {
-        printf("\tpop\tfp[%d]\n", addressTable[function][i]);
-    }
-}
-
-int ex(nodeType *p, int blbl, int clbl, functionID function) {
-    int lblx, lbly, lblz;
-    if (!p) return 0;
-    switch(p->node) {
-        case nodeCon:
-            switch (p->con.conType) {
-                case INT: {
-                    printf("\tpush\t%d\n", p->con.iValue);
-                    break;
-                } case CHAR: {
-                    printf("\tpush\t%s\n", p->con.cValue->c_str());
-                    break;
-                } case STR: {
-                    printf("\tpush\t%s\n", p->con.sValue->c_str());
-                    break;
-                }
-            }
-            break;
-        case nodeId: {
-            int i = p->id.i;
-            if (p->id.type == VAR) {
-                get(i, function, p->id.global);
-            } else if (p->id.type == CALL) {
-                const auto& c = p->id.call;
-                if (i < 9) {
-                    auto argument = c.arguments->front();
-                    if (i < 3) {
-                        cout << "\t" << reverseLookup[i] << "\n";
-                        put(argument->id.i, function, argument->id.global);
-                    } else {
-                        ex(argument, blbl, clbl, function);
-                        cout << "\t" << reverseLookup[i] << "\n";
-                    }
-                } else {
-                    for (const auto& argument : *(p->id.call.arguments)) {
-                        ex(argument, blbl, clbl, function);
-                    }
-                    printf("\tcall\tL%03d, %d\n", functionLabel[p->id.call.origin], (int)p->id.call.arguments->size());
-                }
-            }
-            break;
-        } case nodeOpr:
-            switch(p->opr.oper) {
-                case BREAK:
-                    printf("\tjmp\tL%03d\n", blbl);
-                    break;
-                case CONTINUE:
-                    printf("\tjmp\tL%03d\n", clbl);
-                    break;
-                case FOR:
-                    lblx = lbl++;
-                    lbly = lbl++;
-                    lblz = lbl++;
-                    ex(p->opr.op[0], blbl, clbl, function);
-                    printf("L%03d:\n", lblx);
-                    ex(p->opr.op[1], blbl, clbl, function);
-                    printf("\tj0\tL%03d\n", lbly);
-                    ex(p->opr.op[3], lbly, lblz, function);
-                    printf("L%03d:\n", lblz);
-                    ex(p->opr.op[2], blbl, clbl, function);
-                    printf("\tjmp\tL%03d\n", lblx);
-                    printf("L%03d:\n", lbly);
-                    break;
-                case WHILE:
-                    lblx = lbl++;
-                    lbly = lbl++;
-                    printf("L%03d:\n", lblx);
-                    ex(p->opr.op[0], blbl, clbl, function);
-                    printf("\tj0\tL%03d\n", lbly);
-                    ex(p->opr.op[1], lbly, lblx, function);
-                    printf("\tjmp\tL%03d\n", lblx);
-                    printf("L%03d:\n", lbly);
-                    break;
-                case IF:
-                    ex(p->opr.op[0], blbl, clbl, function);
-                    if (p->opr.nops > 2) {
-                        /* if else */
-                        printf("\tj0\tL%03d\n", lblx = lbl++);
-                        ex(p->opr.op[1], blbl, clbl, function);
-                        printf("\tjmp\tL%03d\n", lbly = lbl++);
-                        printf("L%03d:\n", lblx);
-                        ex(p->opr.op[2], blbl, clbl, function);
-                        printf("L%03d:\n", lbly);
-                    } else {
-                        /* if */
-                        printf("\tj0\tL%03d\n", lblx = lbl++);
-                        ex(p->opr.op[1], blbl, clbl, function);
-                        printf("L%03d:\n", lblx);
-                    }
-                    break;
-                case RETURN: {
-                    if (p->opr.nops == 0) {
-                        printf("\tpush\t0\n");
-                    } else {
-                        ex(p->opr.op[0], blbl, clbl, function);
-                    }
-                    printf("\tret\n");
-                    break;
-                }
-                case '=': {
-                    ex(p->opr.op[1], blbl, clbl, function);
-                    if (p->opr.op[1]->node != nodeId or p->opr.op[1]->id.type != FUNCTION) {
-                        put(p->opr.op[0]->id.i, function, p->opr.op[0]->id.global);
-                    }
-                    break;
-                }
-                case UMINUS:
-                    ex(p->opr.op[0], blbl, clbl, function);
-                    printf("\tneg\n");
-                    break;
-                default:
-                    if (p->opr.nops == 0) {
-                        return 0;
-                    }
-                    ex(p->opr.op[0], blbl, clbl, function);
-                    if (p->opr.nops == 1) {
-                        return 0;
-                    }
-                    ex(p->opr.op[1], blbl, clbl, function);
-                    switch(p->opr.oper) {
-                        case '+':   printf("\tadd\n"); break;
-                        case '-':   printf("\tsub\n"); break;
-                        case '*':   printf("\tmul\n"); break;
-                        case '/':   printf("\tdiv\n"); break;
-                        case '%':   printf("\tmod\n"); break;
-                        case '<':   printf("\tcompLT\n"); break;
-                        case '>':   printf("\tcompGT\n"); break;
-                        case GE:    printf("\tcompGE\n"); break;
-                        case LE:    printf("\tcompLE\n"); break;
-                        case NE:    printf("\tcompNE\n"); break;
-                        case EQ:    printf("\tcompEQ\n"); break;
-                        case AND:   printf("\tand\n"); break;
-                        case OR:    printf("\tor\n"); break;
-                    }
-            }
-    }
-    return 0;
-}
-void run(nodeType *p) {
+*/
+void run(shared_ptr<Node> p) {
+    operatorInstruction = map<int, string> {{'+', "add"}, {'-', "sub"}, {'*', "mul"}, 
+                                            {'/', "div"}, {'%', "mod"}, {'<', "compLT"},
+                                            {'>', "compGT"}, {GE, "compGE"}, {LE, "compLE"},
+                                            {NE, "compNE"}, {EQ, "compEQ"}, {AND, "and"},
+                                            {OR, "or"}};
     variableTable[GLOBAL] = set<id>{};
-    functionTable[GLOBAL] = map<functionID, nodeType*>();    
+    functionTable[GLOBAL] = map<functionID, shared_ptr<Node> >();    
     for (auto i = 0; i != 9; ++i) {
-        functionTable[GLOBAL][i] = nullptr;
+ //       functionTable[GLOBAL][i] = nullptr;
     }
     scopeCounter = 1;
     vector<scope> sList{GLOBAL};
     #if DEBUG
-        for (auto i = 0; i != reverseLookup.size(); ++i) {
-            cerr << i << reverseLookup[i] << endl;
-        }
+//        for (auto i = 0; i != reverseLookup.size(); ++i) {
+ //           cerr << i << reverseLookup[i] << endl;
+  //      }
     #endif
-    preCheck(p, sList, GLOBAL);
+ //   preCheck(p, sList, GLOBAL);
+
     if (addressTable[GLOBAL].size() != 0) {
         printf("\tpush\tsp\n");
         printf("\tpush\t%d\n", int(addressTable[GLOBAL].size()));
         printf("\tadd\n");
         printf("\tpop\tsp\n");
     }
-    ex(p, 998, 998, GLOBAL);
+ //   ex(p, 998, 998, GLOBAL);
+    p->ex(998, 998, GLOBAL);
     printf("\tend\n");
-    defineFunctions();
+//    defineFunctions();
 }
+
