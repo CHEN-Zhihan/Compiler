@@ -1,7 +1,13 @@
-def main(a, b) {
-    return a * b;
+// function that initialize global variable
+a = 20;
+def finit() {
+  @a = 10;
 }
-y = 3;
-x = main(y, 6);
 
-puti(x);
+def fout() {
+  puti(@a);
+}
+
+finit();
+fout();
+

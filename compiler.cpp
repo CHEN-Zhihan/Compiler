@@ -153,6 +153,7 @@ void defineFunctions() {
             printf("\tpop\tsp\n");
         }
         ex(func->id.function.stmts, 998, 998, FID.first);
+        printf("\tret\n");
     }
 }
 
