@@ -213,11 +213,17 @@ void FunctionNode::check(vector<int>& sList, int base) const {
     addressTable[i] = map<int, int>();
     int size = 0;
     functionTable[i] = this;
+    set<int> duplicateSet;
     for (auto j = parameters.begin(); j != parameters.end(); ++j) {
         if (functionTable.count((*j)->getID()) != 0) {
             cerr << "Redefinition of function: " << reverseLookup[(*j)->getID()] << endl;
             exit(-1);
         }
+        if (duplicateSet.count((*j)->getID()) != 0) {
+            cerr << "duplicate argument '" << reverseLookup[(*j)->getID()] << "' in function definition" << endl;
+            exit(-1);
+        }
+        duplicateSet.insert((*j)->getID());
         variableTable[i].insert((*j)->getID());
         #if DEBUG
             cerr << "add variable " << j->getID() << " to " << i << endl;
