@@ -1,19 +1,23 @@
 %{
-#include <cstdlib>
-using std::atoi;
-#include <cstring>
-using std::strlen;
+
+
 #include <string>
 using std::string;
+#include <cstdlib>
+using std::atoi;
 #include <list>
 using std::list;
 #include <iostream>
 using std::cout;    using std::endl;
+
+#include <algorithm>
+using std::transform;
+
 #include "Node.h"
 #include "parser.tab.h"
 void yyerror(char *);
 %}
-%option yylineno caseless
+%option yylineno
 %%
 
 [a-zA-Z][a-zA-Z0-9_]*    {
@@ -45,6 +49,7 @@ void yyerror(char *);
                                 yyerror(buffer);
                                 exit(0);
                             }
+                            transform(temp.begin(), temp.end(), temp.begin(), tolower);
                             yylval.variable = new string(temp);
                             return VARIABLE;
                         }

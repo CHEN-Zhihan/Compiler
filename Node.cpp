@@ -205,27 +205,29 @@ void FunctionNode::check(vector<int>& sList, int base) const {
         cerr << "Function " << reverseLookup[i] << " can only be defined in the global scope" << endl;
         exit(-1);
     }
-    if (functionTable.count(i) == 0) {
-        variableTable[i] = set<int>();
-        addressTable[i] = map<int, int>();
-        int size = 0;
-        functionTable[i] = this;
-        for (auto j = parameters.begin(); j != parameters.end(); ++j) {
-            if (functionTable.count((*j)->getID()) != 0) {
-                cerr << "Redefinition of function: " << reverseLookup[(*j)->getID()] << endl;
-                exit(-1);
-            }
-            variableTable[i].insert((*j)->getID());
-            #if DEBUG
-                cerr << "add variable " << j->getID() << " to " << i << endl;
-            #endif
-            addressTable[i][(*j)->getID()] = - 3 + (size++) - parameters.size();
-        }
-        #if DEBUG
-            cerr << "adding function " << ID.i << " to " << GLOBAL << endl;
-        #endif
-        variableTable[GLOBAL].insert(i);
+    if (functionTable.count(i) != 0) {
+        cerr << "Redefinition of function: " << reverseLookup[i] << endl;
+        exit(-1);
     }
+    variableTable[i] = set<int>();
+    addressTable[i] = map<int, int>();
+    int size = 0;
+    functionTable[i] = this;
+    for (auto j = parameters.begin(); j != parameters.end(); ++j) {
+        if (functionTable.count((*j)->getID()) != 0) {
+            cerr << "Redefinition of function: " << reverseLookup[(*j)->getID()] << endl;
+            exit(-1);
+        }
+        variableTable[i].insert((*j)->getID());
+        #if DEBUG
+            cerr << "add variable " << j->getID() << " to " << i << endl;
+        #endif
+        addressTable[i][(*j)->getID()] = - 3 + (size++) - parameters.size();
+    }
+    #if DEBUG
+        cerr << "adding function " << ID.i << " to " << GLOBAL << endl;
+    #endif
+    variableTable[GLOBAL].insert(i);
 }
 
 CallNode::CallNode(int i, const list<shared_ptr<Node> > a):IDNode(i), arguments(a) {;}
