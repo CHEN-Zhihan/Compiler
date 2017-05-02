@@ -320,7 +320,7 @@ void VarNode::ex(int blbl, int clbl, int function) const {
 
 void VarNode::assign(vector<int> & sList, int functionBase) const {
     if (functionTable.count(i) != 0) {
-        cerr << "Redefinition of function " << reverseLookup[i] << endl;
+        cerr << "Redefinition of function: " << reverseLookup[i] << endl;
         exit(-1);
     }
     if (global) {

@@ -1,0 +1,11 @@
+a = 1;
+b = 2;
+if (a > 5) {
+    c = 5;
+    b = b + c;
+} else {
+    c = 6;
+    b = b + c;
+}
+puti(b);
+puti(c);

@@ -1,12 +1,12 @@
 c6: scanner.cpp parser.tab.c compiler.cpp cvm Node.cpp Node.h
 	g++ scanner.cpp parser.tab.c compiler.cpp Node.cpp -o c6 -std=c++11 -g
 
-compile: c6 test/test.sc
-	./c6 test/test.sc
+compile: c6 test.sc
+	./c6 test.sc
 
-run: c6 test/test.sc cvm
-	./c6 test/test.sc > test/test.as
-	./cvm test/test.as
+run: c6 test.sc cvm
+	./c6 test.sc > test.as
+	./cvm test.as
 
 
 scanner.cpp: scanner.l
