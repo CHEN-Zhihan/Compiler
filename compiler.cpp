@@ -9,11 +9,11 @@ using std::list;
 #include <vector>
 using std::vector;
 
-#include <map>
-using std::map;
+#include <unordered_map>
+using std::unordered_map;
 
-#include <set>
-using std::set;
+#include <unordered_set>
+using std::unordered_set;
 
 #include "Node.h"
 #include "parser.tab.h"
@@ -25,11 +25,11 @@ extern int GLOBAL;
 #define DEBUG false
 
 extern vector<string> reverseLookup;/* maps a variable identifier to a name*/
-map<int,  const FunctionNode* >functionTable; /* maps a function ID to the node it corresponds to*/
-map<scope, set<int> > variableTable; /*maps a scope to the set of visible variables*/
-map<int, string> operatorInstruction; /*maps an operator to the instruction to be printed*/
-map<int, int> functionLabel; /*maps a function id to the label number*/
-map<int, map<int, int> > addressTable; /*maps a function to an address table it holds for local/global variables*/
+unordered_map<int,  const FunctionNode* >functionTable; /* maps a function ID to the node it corresponds to*/
+unordered_map<scope, unordered_set<int> > variableTable; /*maps a scope to the set of visible variables*/
+unordered_map<int, string> operatorInstruction; /*maps an operator to the instruction to be printed*/
+unordered_map<int, int> functionLabel; /*maps a function id to the label number*/
+unordered_map<int, unordered_map<int, int> > addressTable; /*maps a function to an address table it holds for local/global variables*/
 
 
 /*
@@ -53,13 +53,13 @@ void defineFunctions() {
 }
 
 void run(shared_ptr<Node> p) {
-    operatorInstruction = map<int, string> {{'+', "add"}, {'-', "sub"}, {'*', "mul"}, 
+    operatorInstruction = unordered_map<int, string> {{'+', "add"}, {'-', "sub"}, {'*', "mul"}, 
                                             {'/', "div"}, {'%', "mod"}, {'<', "compLT"},
                                             {'>', "compGT"}, {GE, "compGE"}, {LE, "compLE"},
                                             {NE, "compNE"}, {EQ, "compEQ"}, {AND, "and"},
                                             {OR, "or"}};
-    variableTable[GLOBAL] = set<int>{};
-    functionTable = map<int, const FunctionNode* >();    
+    variableTable[GLOBAL] = unordered_set<int>{};
+    functionTable = unordered_map<int, const FunctionNode* >();    
     for (auto i = 0; i != 9; ++i) {
         variableTable[GLOBAL].insert(i);
         functionTable[i] = nullptr;

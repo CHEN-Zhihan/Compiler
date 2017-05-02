@@ -8,8 +8,11 @@ using std::printf;
 #include <map>
 using std::map;
 
-#include <set>
-using std::set;
+#include <unordered_map>
+using std::unordered_map;
+
+#include <unordered_set>
+using std::unordered_set;
 
 #include "Node.h"
 #include "parser.tab.h"
@@ -19,7 +22,7 @@ using std::dynamic_pointer_cast;    using std::make_shared;
 
 #define ADDSCOPE(node)\
     sList.push_back(++scopeCounter);\
-    variableTable[scopeCounter] = set<int>();\
+    variableTable[scopeCounter] = unordered_set<int>();\
     node->check(sList, functionBase);\
     sList.pop_back();
 
@@ -27,11 +30,11 @@ static int lbl = 0;
 static int scopeCounter = 1;
 int GLOBAL = 0;
 
-extern map<int, string> operatorInstruction;
-extern map<int, int> functionLabel;
-extern map<int, map<int, int> > addressTable;
-extern map<int, const FunctionNode* > functionTable;
-extern map<int, set<int> > variableTable;
+extern unordered_map<int, string> operatorInstruction;
+extern unordered_map<int, int> functionLabel;
+extern unordered_map<int, unordered_map<int, int> > addressTable;
+extern unordered_map<int, const FunctionNode* > functionTable;
+extern unordered_map<int, unordered_set<int> > variableTable;
 extern vector<string> reverseLookup;
 
 StrNode::StrNode(const string& v):value(v) {;}
@@ -209,11 +212,11 @@ void FunctionNode::check(vector<int>& sList, int base) const {
         cerr << "Redefinition of function: " << reverseLookup[i] << endl;
         exit(-1);
     }
-    variableTable[i] = set<int>();
-    addressTable[i] = map<int, int>();
+    variableTable[i] = unordered_set<int>();
+    addressTable[i] = unordered_map<int, int>();
     int size = 0;
     functionTable[i] = this;
-    set<int> duplicateSet;
+    unordered_set<int> duplicateSet;
     for (auto j = parameters.begin(); j != parameters.end(); ++j) {
         if (functionTable.count((*j)->getID()) != 0) {
             cerr << "Redefinition of function: " << reverseLookup[(*j)->getID()] << endl;

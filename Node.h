@@ -18,6 +18,7 @@ public:
     Node()=default;
     virtual void ex(int, int, int) const = 0;
     virtual void check(vector<int>&, int) const = 0;
+    virtual ~Node() {;};
 };
 
 class ConNode: public Node {

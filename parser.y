@@ -9,8 +9,8 @@ using std::cerr;
 #include <string>
 using std::string;
 
-#include <map>
-using std::map; using std::pair;
+#include <unordered_map>
+using std::unordered_map; using std::pair;
 
 #include <vector>
 using std::vector;
@@ -39,7 +39,7 @@ void buildList(shared_ptr<Node>, list<shared_ptr<Node> > *);
 void run(shared_ptr<Node> p);
 int yylex(void);
 void yyerror(char *s);
-static map<string, int> nameMap;
+static unordered_map<string, int> nameMap;
 set<int> functionSet;
 set<int> callSet;
 vector<string> reverseLookup;

@@ -1,1 +1,5 @@
-puti(puti(10));
+def main(a, b) {
+    return 0;
+}
+
+main(5, 6);
