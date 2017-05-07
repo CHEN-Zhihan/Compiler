@@ -13,29 +13,29 @@ char text[500];
 %%
 
 -?[0-9]+	{
-		  yylval.i = atoi(yytext);
-		  return INT;
-		}
+          yylval.i = atoi(yytext);
+          return INT;
+        }
 sb		{
-		  yylval.i = 0;
-		  return REG;
-		}
+          yylval.i = 0;
+          return REG;
+        }
 fp		{
-		  yylval.i = 1;
-		  return REG;
-		}
+          yylval.i = 1;
+          return REG;
+        }
 "in"|"ac"		{
-		  yylval.i = 2;
-		  return REG;
-		}
+          yylval.i = 2;
+          return REG;
+        }
 sp		{
-		  yylval.i = 3;
-		  return REG;
-		}
+          yylval.i = 3;
+          return REG;
+        }
 L[0-9]{3}	{
-		  yylval.i = atoi(yytext + 1); // L123 -> 123
-		  return LABEL;
-		}
+          yylval.i = atoi(yytext + 1); // L123 -> 123
+          return LABEL;
+        }
 
 \"		{ BEGIN S; *text = 0; }
 <S>[^"\\]*	{ strcat(text, yytext); }

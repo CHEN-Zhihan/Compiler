@@ -66,6 +66,8 @@ void yyerror(char *);
 [-()<>=+*/;{}.%\[\]@,] {
                 return *yytext;
              }
+"++"        return INC;
+"--"        return DEC;
 \"([^\"\\]|\\[ntr0\\\"])*\"  {
                 yylval.sValue = new string(yytext);
                 return STRING;

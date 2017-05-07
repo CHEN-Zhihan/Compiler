@@ -51,7 +51,16 @@ IntNode::IntNode(const int& i):value(i){;}
 void IntNode::ex(int, int, int) const {
     cout << "\tpush\t" << value << "\n";
 }
-
+void incdec(shared_ptr<VarNode> v, int blbl, int clbl, int function, bool inc) {
+    v->ex(blbl, clbl, function);
+    printf("\tpush\t1\n");
+    if (inc) {
+        printf("\tadd\n");
+    } else {
+        printf("\tsub\n");
+    }
+    v->pop(function);
+}
 OprNode::OprNode(int oper, const vector<shared_ptr<Node> >& op):oper(oper), op(op) {;}
 void OprNode::ex(int blbl, int clbl, int function) const {
     int lblx, lbly, lblz;
@@ -120,6 +129,22 @@ void OprNode::ex(int blbl, int clbl, int function) const {
         } case UMINUS: {
             op[0]->ex(blbl, clbl, function);
             printf("\tneg\n");
+            break;
+        } case POSINC: {
+            op[0]->ex(blbl, clbl, function);
+            incdec(dynamic_pointer_cast<VarNode>(op[0]), blbl, clbl, function, true);
+            break;
+        } case PREINC: {
+            incdec(dynamic_pointer_cast<VarNode>(op[0]), blbl, clbl, function, true);
+            op[0]->ex(blbl, clbl, function);            
+            break;
+        } case POSDEC: {
+            op[0]->ex(blbl, clbl, function);
+            incdec(dynamic_pointer_cast<VarNode>(op[0]), blbl, clbl, function, false);
+            break;
+        } case PREDEC: {
+            incdec(dynamic_pointer_cast<VarNode>(op[0]), blbl, clbl, function, false);
+            op[0]->ex(blbl, clbl, function);
             break;
         } default: {
             for (const auto& i: op) {

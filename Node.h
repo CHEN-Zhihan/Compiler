@@ -73,15 +73,20 @@ protected:
 class VarNode: public IDNode {
 public:
     VarNode(int, bool);
-    void ex(int, int, int) const;
-    void check(vector<int>&, int) const;
-    void assign(vector<int>&, int) const;
-    void pop(int) const;
+    virtual void ex(int, int, int) const;
+    virtual void check(vector<int>&, int) const;
+    virtual void assign(vector<int>&, int) const;
+    virtual void pop(int) const;
 private:
     bool global;
     int getDefinitionScope(const vector<int>&, int) const;    
     void push(int) const;
+};
 
+class ArrayNode:public VarNode {
+public:
+    ArrayNode(int, const vector<int>&, bool);
+    
 };
 
 class FunctionNode: public IDNode {

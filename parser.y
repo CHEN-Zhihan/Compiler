@@ -59,19 +59,19 @@ static int nameCounter;
 %token <cValue> CHARACTER
 %token <sValue> STRING
 %token <variable> VARIABLE
-%token FOR WHILE IF PRINT READ BREAK CONTINUE END RETURN DEF
+%token FOR WHILE IF PRINT READ BREAK CONTINUE END RETURN DEF INC DEC
 %nonassoc IFX
 %nonassoc ELSE
 
 %left AND OR
 
 %left GE LE EQ NE '>' '<'
-%left '+' '-'
+%left '+' '-' POSINC PREINC POSDEC PREDEC
 %left '*' '/' '%'
 %nonassoc UMINUS
 
 %type <nPtr> stmt expr stmt_list variable constant
-%type <lists> argumentList parameterList
+%type <lists> argumentList parameterList subscriptionList
 %%
 
 
@@ -95,6 +95,10 @@ argumentList:
         |                                     { $$ = buildList();}
         ;
 
+subscriptionList:
+        '[' expr ']'                        {$$ = buildList(shared_ptr<Node>($2));}
+        |  '[' expr ']' subscriptionList      {buildList(shared_ptr<Node>($2), $4); $$ = $4;}
+        ;
 stmt:
           ';'                                 { $$ = opr(';', {}); }
         | expr ';'                            { $$ = $1;}
@@ -119,6 +123,7 @@ constant:
 variable:
         VARIABLE                { $$ = id($1);}
         | '@' VARIABLE          { $$ = id($2, true);}
+ //       | variable '[' expr ']' { $$ = id($1, $3);}
 
 stmt_list:
           stmt                  { $$ = $1;}
@@ -135,6 +140,10 @@ expr:
         | expr '/' expr         { $$ = opr('/', {$1, $3}); }
         | expr '<' expr         { $$ = opr('<', {$1, $3}); }
         | expr '>' expr         { $$ = opr('>', {$1, $3}); }
+        | expr  INC             { $$ = opr(POSINC, {$1});}
+        | expr DEC             { $$ = opr(POSDEC, {$1});}
+        | INC expr             { $$ = opr(PREINC, {$2});}
+        | DEC expr             { $$ = opr(PREDEC, {$2});}
         | expr GE expr          { $$ = opr(GE, {$1, $3}); }
         | expr LE expr          { $$ = opr(LE, {$1, $3}); }
         | expr NE expr          { $$ = opr(NE, {$1, $3}); }

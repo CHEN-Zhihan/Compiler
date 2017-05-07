@@ -7,7 +7,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceRoot}/c6",
-            "args": ["test/test.sc"],
+            "args": ["test.sc"],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
             "environment": [],
