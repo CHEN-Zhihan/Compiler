@@ -7,7 +7,7 @@ using std::string;
 using std::list;
 
 #include <vector>
-using std::vector;
+using std::vector;  using std::pair;
 
 #include <unordered_map>
 using std::unordered_map;
@@ -29,7 +29,7 @@ unordered_map<int,  const FunctionNode* >functionTable; /* maps a function ID to
 unordered_map<scope, unordered_set<int> > variableTable; /*maps a scope to the set of visible variables*/
 unordered_map<int, string> operatorInstruction; /*maps an operator to the instruction to be printed*/
 unordered_map<int, int> functionLabel; /*maps a function id to the label number*/
-unordered_map<int, unordered_map<int, int> > addressTable; /*maps a function to an address table it holds for local/global variables*/
+unordered_map<int, pair<int, unordered_map<int, int> > >addressTable; /*maps a function to an address table it holds for local/global variables*/
 
 
 /*
@@ -72,9 +72,9 @@ void run(shared_ptr<Node> p) {
     #endif
     p->check(sList, GLOBAL);
 
-    if (addressTable[GLOBAL].size() != 0) {
+    if (addressTable[GLOBAL].first != 0) {
         printf("\tpush\tsp\n");
-        printf("\tpush\t%d\n", int(addressTable[GLOBAL].size()));
+        printf("\tpush\t%d\n", addressTable[GLOBAL].first);
         printf("\tadd\n");
         printf("\tpop\tsp\n");
     }

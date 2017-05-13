@@ -6,7 +6,7 @@ using std::cerr;
 using std::printf;
 
 #include <map>
-using std::map;
+using std::map; using std::pair;
 
 #include <unordered_map>
 using std::unordered_map;
@@ -32,7 +32,7 @@ int GLOBAL = 0;
 
 extern unordered_map<int, string> operatorInstruction;
 extern unordered_map<int, int> functionLabel;
-extern unordered_map<int, unordered_map<int, int> > addressTable;
+extern unordered_map<int, pair<int, unordered_map<int, int> > > addressTable;
 extern unordered_map<int, const FunctionNode* > functionTable;
 extern unordered_map<int, unordered_set<int> > variableTable;
 extern vector<string> reverseLookup;
@@ -238,7 +238,7 @@ void FunctionNode::check(vector<int>& sList, int base) const {
         exit(-1);
     }
     variableTable[i] = unordered_set<int>();
-    addressTable[i] = unordered_map<int, int>();
+    addressTable[i] = {0, unordered_map<int, int>()};
     int size = 0;
     functionTable[i] = this;
     unordered_set<int> duplicateSet;
@@ -256,7 +256,7 @@ void FunctionNode::check(vector<int>& sList, int base) const {
         #if DEBUG
             cerr << "add variable " << j->getID() << " to " << i << endl;
         #endif
-        addressTable[i][(*j)->getID()] = - 3 + (size++) - parameters.size();
+        addressTable[i].second[(*j)->getID()] = - 3 + (size++) - parameters.size();
     }
     #if DEBUG
         cerr << "adding function " << ID.i << " to " << GLOBAL << endl;
@@ -325,17 +325,17 @@ VarNode::VarNode(int i, bool global):IDNode(i), global(global){;}
 
 void VarNode::push(int function) const {
     if (global or function == GLOBAL) {
-        printf("\tpush\tsb[%d]\n", addressTable[GLOBAL][i]);
+        printf("\tpush\tsb[%d]\n", addressTable[GLOBAL].second[i]);
     } else {
-        printf("\tpush\tfp[%d]\n", addressTable[function][i]);
+        printf("\tpush\tfp[%d]\n", addressTable[function].second[i]);
     }
 }
 
 void VarNode::pop(int function) const {
     if (global or function == GLOBAL) {
-        printf("\tpop\tsb[%d]\n", addressTable[GLOBAL][i]);
+        printf("\tpop\tsb[%d]\n", addressTable[GLOBAL].second[i]);
     } else {
-        printf("\tpop\tfp[%d]\n", addressTable[function][i]);
+        printf("\tpop\tfp[%d]\n", addressTable[function].second[i]);
     }
 }
 
@@ -354,19 +354,18 @@ void VarNode::assign(vector<int> & sList, int functionBase) const {
             exit(-1);
         }
         if (variableTable[GLOBAL].count(i) == 0) {
-            auto size = addressTable[GLOBAL].size();
             variableTable[GLOBAL].insert(i);
-            addressTable[GLOBAL][i] = size;
+            addressTable[GLOBAL].second[i] = addressTable[GLOBAL].first++;
         }
     } else {
         int s = getDefinitionScope(sList, functionBase);
         if (s == -1) {
-            if (addressTable[sList[functionBase]].count(i) == 0) {
-                auto size = addressTable[sList[functionBase]].size();
+            if (addressTable[sList[functionBase]].second.count(i) == 0) {
+                auto size = addressTable[sList[functionBase]].first++;
                 if (sList[functionBase] != GLOBAL) {
                     size -= functionTable[sList[functionBase]]->getNumParameters();
                 }
-                addressTable[sList[functionBase]][i] = size;
+                addressTable[sList[functionBase]].second[i] = size;
             }
             variableTable[sList.back()].insert(i);
             #if DEBUG

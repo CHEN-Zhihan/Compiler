@@ -31,6 +31,7 @@ Node* con(int value);
 Node* con(const string * value);
 Node* conChar(const string * value);
 Node* id(const string *, bool isGlobal=false);
+Node* id(Node *, list<shared_ptr<Node> > *);
 Node* call(const string *, list<shared_ptr<Node> >*);
 Node* func(const string *, list<shared_ptr<Node> >*, Node*);
 list<shared_ptr<Node> > * buildList();
@@ -59,7 +60,7 @@ static int nameCounter;
 %token <cValue> CHARACTER
 %token <sValue> STRING
 %token <variable> VARIABLE
-%token FOR WHILE IF PRINT READ BREAK CONTINUE END RETURN DEF INC DEC
+%token FOR WHILE IF PRINT READ BREAK CONTINUE END RETURN DEF INC DEC NEXT
 %nonassoc IFX
 %nonassoc ELSE
 
@@ -84,8 +85,8 @@ program:
         ;
 
 parameterList:
-        VARIABLE                            { $$ = buildList(shared_ptr<Node>(id($1)));}
-        | VARIABLE ',' parameterList        { buildList(shared_ptr<Node>(id($1)), $3); $$ = $3;}
+        VARIABLE ':' type                           { $$ = buildList(shared_ptr<Node>(id($1)));}
+        | VARIABLE ':' type NEXT parameterList        { buildList(shared_ptr<Node>(id($1)), $3); $$ = $3;}
         |                                   { $$ = buildList();}
         ;
 
@@ -94,6 +95,19 @@ argumentList:
         | expr ',' argumentList               { buildList(shared_ptr<Node>($1), $3); $$ = $3;}
         |                                     { $$ = buildList();}
         ;
+
+declareVar:
+        variable                            {}
+        | variable '=' expr                 {}
+        ;
+
+declareList:
+        declareVar
+        | declareList ',' declareVar        {}
+
+declare:
+        type declareList
+        | VARIABLE DEF 
 
 subscriptionList:
         '[' expr ']'                        {$$ = buildList(shared_ptr<Node>($2));}
@@ -123,7 +137,7 @@ constant:
 variable:
         VARIABLE                { $$ = id($1);}
         | '@' VARIABLE          { $$ = id($2, true);}
- //       | variable '[' expr ']' { $$ = id($1, $3);}
+        | variable subscrptionList { $$ = id($1, $2);}
 
 stmt_list:
           stmt                  { $$ = $1;}
@@ -228,6 +242,10 @@ Node * id(const string * name, bool isGlobal) {
     i = nameMap[*name];
     delete name;
     return new VarNode(i, isGlobal);
+}
+
+Node * id(Node * variable, list<shared_ptr<Node> > * subscriptions) {
+
 }
 
 Node * call(const string * name, list<shared_ptr<Node> > * arguments) {
