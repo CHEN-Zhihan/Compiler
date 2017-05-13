@@ -19,6 +19,12 @@ public:
     virtual void ex(int, int, int) const = 0;
     virtual void check(vector<int>&, int) const = 0;
     virtual ~Node() {;};
+    enum type {
+        STRING,
+        INT,
+        BOOL,
+        CHAR
+    };
 };
 
 class ConNode: public Node {
@@ -28,6 +34,7 @@ public:
         ;
     }
 };
+
 
 class StrNode:public ConNode {
 public:
@@ -58,7 +65,7 @@ public:
     OprNode(int, const vector<shared_ptr<Node>>&);
     void ex(int, int, int) const;
     void check(vector<int>&, int) const;
-private:
+protected:
     int oper;
     vector<shared_ptr<Node>> op;
 };
@@ -72,13 +79,14 @@ protected:
 };
 class VarNode: public IDNode {
 public:
-    VarNode(int, bool);
+    VarNode(int, bool, const list<shared_ptr<Node> >&);
     virtual void ex(int, int, int) const;
     virtual void check(vector<int>&, int) const;
     virtual void assign(vector<int>&, int) const;
     virtual void pop(int) const;
 private:
     bool global;
+    list<shared_ptr<Node>> subscriptions;
     int getDefinitionScope(const vector<int>&, int) const;    
     void push(int) const;
 };
@@ -86,8 +94,25 @@ private:
 class ArrayNode:public VarNode {
 public:
     ArrayNode(int, const vector<int>&, bool);
-    
 };
+
+class ExprNode: public OprNode {
+public:
+    ExprNode(int, const vector<shared_ptr<Node>>&);
+    void ex(int, int, int) const;
+    void check(vector<int>&, int) const;
+    void inStmt();
+private:
+    bool inStatement;
+};
+
+class StmtNode: public OprNode {
+public:
+    StmtNode(int, const vector<shared_ptr<Node>>&);
+    void ex(int, int, int) const;
+    void check(vector<int>&, int) const;
+};
+
 
 class FunctionNode: public IDNode {
 public:

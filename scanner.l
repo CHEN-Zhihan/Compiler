@@ -63,7 +63,7 @@ void yyerror(char *);
                 return INTEGER;
             }
 
-[-()<>=+*/;{}.%\[\]@,] {
+[-()<>=+*/;{}.%\[\]@,&] {
                 return *yytext;
              }
 "++"        return INC;
@@ -81,7 +81,9 @@ void yyerror(char *);
 "||"        return OR;
 \/\/.*\n    ;    /* skip comments */
 [ \t\n]+    ;       /* ignore whitespace */
-
+"int "      {yylval.type = new string(yytext); return TYPE;}
+"string "      {yylval.type = new string(yytext); return TYPE;}
+"char "      {yylval.type = new string(yytext); return TYPE;}
 .           yyerror(yytext);
 <<EOF>>     return END;
 %%
