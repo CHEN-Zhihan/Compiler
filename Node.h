@@ -14,7 +14,7 @@ using std::shared_ptr;
 using std::list;
 
 enum VALUE_TYPE {
-    UNKNOWN, STRING, INT, BOOL, CHAR, VOID
+    UNKNOWN = -2, STRING = -3, INT = -4, BOOL = -5, CHAR = -6, VOID = -7
 };
 
 
@@ -98,6 +98,25 @@ class IDNode : public Node {
     int i;
 };
 
+class DeclareNode : public IDNode { // denote the local variable declared.
+  public:
+    DeclareNode(Node * variable, Node * initializer=nullptr);
+    void setType(VALUE_TYPE);
+  private:
+    const vector<int> dimensions;
+    shared_ptr<Node> initializer;
+};
+
+class FunctionParameterDeclareNode : public IDNode { // denote the parameter in function definition.
+  public:
+    FunctionParameterDeclareNode(VALUE_TYPE, int, int);
+
+  private:
+    VALUE_TYPE type;
+
+};
+
+
 class VarNode : public IDNode {
   public:
     VarNode(int, bool, const list<shared_ptr<Node>> &);
@@ -108,9 +127,14 @@ class VarNode : public IDNode {
     void setType(VALUE_TYPE);
   private:
     bool global;
+    shared_ptr<Node> initializer;
     list<shared_ptr<Node>> subscriptions;
     int getDefinitionScope(const vector<int> &, int) const;
     void push(int) const;
+};
+
+class ArrayNode: public VarNode {
+
 };
 
 class ExprNode : public OprNode {
@@ -119,21 +143,11 @@ class ExprNode : public OprNode {
     void ex(int, int, int) const;
     void check(vector<int> &, int) const;
     void inStmt();
+    void initialize();
   private:
     bool inStatement;
 };
 
-class DeclareVarNode : public OprNode {
-public:
-    DeclareVarNode(VALUE_TYPE, const vector<shared_ptr<Node>>&);
-    void ex(int, int, int) const;
-    void check(vector<int>&, int) const;
-  private:
-};
-
-class DeclareFunctionNode:public OprNode {
-
-};
 
 class StmtNode : public OprNode {
   public:

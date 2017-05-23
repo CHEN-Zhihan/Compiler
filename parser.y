@@ -31,12 +31,12 @@ Node* con(int value);
 Node* con(const string * value);
 Node* conChar(const string * value);
 Node* boolean(bool);
-Node* id(const string *, bool isGlobal=false);
 Node* id(const string *, bool isGlobal=false, list<shared_ptr<Node> > * l=nullptr);
 Node* stmt(int, const vector<Node*>*);
 Node* call(const string *, list<shared_ptr<Node> >*);
 Node* define(const string *, list<shared_ptr<Node> >*, Node*);
 Node* declare(VALUE_TYPE, list<shared_ptr<Node> >*);
+Node* parameter(VALUE_TYPE, const string *, int);
 list<shared_ptr<Node> > * buildList()
 list<shared_ptr<Node> > * buildList(shared_ptr<Node>);
 void buildList(list<shared_ptr<Node> > *, shared_ptr<Node>);
@@ -49,7 +49,6 @@ set<int> callSet;
 vector<string> reverseLookup;
 static int nameCounter;
 constexpr int STMT_LIST = -1;
-constexpr int DECLARE_VARIABLE = -2;
 %}
 %debug
 %union {
@@ -82,7 +81,7 @@ constexpr int DECLARE_VARIABLE = -2;
 %nonassoc UMINUS
 
 %type <nPtr> stmt expr variable constant
-%type <lists> argList parList subscriptionList stmtList nonEmptyParList nonEmptyArgList declareParList declareNonEmptyParList
+%type <lists> argList parList subscriptionList stmtList nonEmptyParList nonEmptyArgList
 %type <dimension> subscriptions
 %%
 
@@ -100,8 +99,8 @@ parList:
         ;
 
 nonEmptyParList:
-        TYPE VARIABLE subscriptions                          { $$ = buildList(shared_ptr<Node>(id($1, $2, $3)));}
-        | nonEmptyParList ','  TYPE VARIABLE subscriptions        { buildList(shared_ptr<Node>($1, id($3, $4, $5))); $$ = $1;}
+        TYPE VARIABLE subscriptions                          { $$ = buildList(shared_ptr<Node>(parameter($1, $2, $3)));}
+        | nonEmptyParList ','  TYPE VARIABLE subscriptions        { buildList(shared_ptr<Node>($1, parameter($3, $4, $5))); $$ = $1;}
         ;
 
 argList:
@@ -117,14 +116,14 @@ nonEmptyArgList:
 
 
 declareVar:
-        variable                            {$$ = $1;} //TODO implement declare var
-        |variable '=' expr                 {$$ = opr(DECLARE_VARIABLE, {$1, $3});}
+        variable                            {$$ = new DeclareNode($1);} //TODO implement declare var
+        |variable '=' expr                 {$$ = new DeclareNode($1, $3);}
         ;
 
 declareList:
         declareVar                          {$$ = buildList(shared_ptr<Node>($1));}
         | declareList ',' declareVar        {buildList($1, shared_ptr<Node>($3)); $$ = $1;}
-
+        ;
 subscriptions:
         |                                   {$$ = 0;}
         | '[' ']'                           {$$ = 1;}
@@ -138,7 +137,7 @@ subscriptionList:
 stmt:
           ';'                                 { $$ = stmt(';', {}); }
         | expr ';'                            { $$ = $1; dynamic_cast<ExprNode>($$)->inStmt();}
-        | TYPE declareList ';'                   {$$ = declare($1, $2);} //TODO implement declare
+        | TYPE declareList ';'                   {$$ = new StmtNode($1, vector<shared_ptr<Node>>($2->begin(), $2->end())); delete $2;} //TODO implement declare
         | FOR '(' stmt stmt stmt ')' stmt     { $$ = stmt(FOR, {$3, $4, $5, $7});}
         | WHILE '(' expr ')' stmt             { $$ = stmt(WHILE, {$3, $5});}
         | IF '(' expr ')' stmt %prec IFX      {  $$ = stmt(IF, {$3, $5});}
@@ -247,13 +246,16 @@ void buildList(list<shared_ptr<Node> > * l, shared_ptr<Node>n) {
     l->push_back(n);
 }
 
-Node * define(const string * name, list<shared_ptr<Node> > * parameters, Node * stmts) {
-    int i;
+int getID(const string * name) {
     if (nameMap.count(*name) == 0) {
         nameMap[*name] = nameCounter++;
         reverseLookup.push_back(*name);
     }
-    i = nameMap[*name];
+    return nameMap[*name];
+}
+
+Node * define(const string * name, list<shared_ptr<Node> > * parameters, Node * stmts) {
+    int i = getID(name);
     if (functionSet.count(i) != 0) {
         cerr << "Redefinition of function: " << *name << endl;
         exit(-1);
@@ -270,12 +272,7 @@ Node * define(const string * name, list<shared_ptr<Node> > * parameters, Node * 
 
 
 Node * id(const string * name, bool isGlobal, list<shared_ptr<Node> > * subscriptions) {
-    int i;
-    if (nameMap.count(*name) == 0) {
-        nameMap[*name] = nameCounter++;
-        reverseLookup.push_back(*name);
-    }
-    i = nameMap[*name];
+    int i = getID(name);
     delete name;
     auto s = list<shared_ptr<Node>>();
     for (const auto & i : *subscriptions) {
@@ -288,17 +285,16 @@ Node * id(const string * name, bool isGlobal, list<shared_ptr<Node> > * subscrip
 
 
 Node * call(const string * name, list<shared_ptr<Node> > * arguments) {
-    int i;
-    if (nameMap.count(*name) == 0) {
-        nameMap[*name] = nameCounter++;
-        reverseLookup.push_back(*name);
-    }
-    i = nameMap[*name];
+    int i = getID(name);
     callSet.insert(i);
     auto p = new CallNode(i, *arguments);
     delete name;
     delete arguments;
     return p;
+}
+
+Node* parameter(VALUE_TYPE, const string *, int) {
+
 }
 
 void init() {
@@ -309,9 +305,6 @@ void init() {
     }
 }
 
-Node* declare(VALUE_TYPE t, list<shared_ptr<Node> >* l) {
-    
-}
 
 
 int main(int argc, const char *argv[]) {
