@@ -20,7 +20,7 @@ using std::set;
 
 
 #include <memory>
-using std::shared_ptr;  using std::make_shared;
+using std::shared_ptr;  using std::make_shared; 
 using std::dynamic_pointer_cast;
 
 #include "Node.h"
@@ -30,14 +30,16 @@ Node* opr(int, const vector<Node*> &);
 Node* con(int value);
 Node* con(const string * value);
 Node* conChar(const string * value);
+Node* boolean(bool);
 Node* id(const string *, bool isGlobal=false);
 Node* id(const string *, bool isGlobal=false, list<shared_ptr<Node> > * l=nullptr);
+Node* stmt(int, const vector<Node*>*);
 Node* call(const string *, list<shared_ptr<Node> >*);
 Node* define(const string *, list<shared_ptr<Node> >*, Node*);
-Node* declare(const string *, list<shared_ptr<Node> >*);
-list<shared_ptr<Node> > * buildList();
+Node* declare(VALUE_TYPE, list<shared_ptr<Node> >*);
+list<shared_ptr<Node> > * buildList()
 list<shared_ptr<Node> > * buildList(shared_ptr<Node>);
-void buildList(shared_ptr<Node>, list<shared_ptr<Node> > *);
+void buildList(list<shared_ptr<Node> > *, shared_ptr<Node>);
 void run(shared_ptr<Node> p);
 int yylex(void);
 void yyerror(char *s);
@@ -46,27 +48,26 @@ set<int> functionSet;
 set<int> callSet;
 vector<string> reverseLookup;
 static int nameCounter;
+constexpr int STMT_LIST = -1;
+constexpr int DECLARE_VARIABLE = -2;
 %}
 %debug
 %union {
     int iValue;                 /* integer value */
     int dimension;
-    bool ref;
+    bool bValue;
     const string * cValue;
     const string * sValue;
     const string * variable;
-    const string * t;
+    VALUE_TYPE t;
     Node * nPtr;             /* node pointer */
     list<shared_ptr<Node> > * lists;
-    VarNode * varNode;
-    ExprNode * exprNode;
-    StmtNode * stmtNode;
-    ConNode * conNode;
 };
 
 %token <iValue> INTEGER
 %token <cValue> CHARACTER
 %token <sValue> STRING
+%token <bValue> BOOLEAN
 %token <variable> VARIABLE
 %token <t> TYPE
 %token FOR WHILE IF PRINT READ BREAK CONTINUE END RETURN DEF INC DEC NEXT
@@ -81,60 +82,48 @@ static int nameCounter;
 %nonassoc UMINUS
 
 %type <nPtr> stmt expr variable constant
-%type <lists> argList parList subscriptionList stmtList nonEmptyParList nonEmptyArgList
+%type <lists> argList parList subscriptionList stmtList nonEmptyParList nonEmptyArgList declareParList declareNonEmptyParList
 %type <dimension> subscriptions
-%type <ref> reference
 %%
 
 
 program:
         stmtList END                          {
-                                                    run(shared_ptr<Node>($1));
+                                                    run(shared_ptr<Node>(stmt($1)));
                                                     exit(0);
                                                 }
         ;
 
 parList:
-        emptyList                         {$$ = $1;}
+        |                         {$$ = buildList();}
         | nonEmptyParList                    {$$ = $1;}
         ;
 
 nonEmptyParList:
-        TYPE VARIABLE                           { $$ = buildList(shared_ptr<Node>(id($1)));}
-        | parameterList ','  TYPE VARIABLE         { buildList(shared_ptr<Node>(id($1)), $3); $$ = $3;}
-        ;
-
-reference:
-        | '&'                               {$$ = true;}
-        |                                   {$$ = false;}
+        TYPE VARIABLE subscriptions                          { $$ = buildList(shared_ptr<Node>(id($1, $2, $3)));}
+        | nonEmptyParList ','  TYPE VARIABLE subscriptions        { buildList(shared_ptr<Node>($1, id($3, $4, $5))); $$ = $1;}
         ;
 
 argList:
-        emptyList                         {$$ = $1;}
+        |                         {$$ = buildList();}
         | nonEmptyArgList                   {$$ = $1;}
         ;
 
-emptyList:
-        |                                   {$$ = buildList();}
-        ;
 
 nonEmptyArgList:
         expr                                  { $$ = buildList(shared_ptr<Node>($1));}
-        | expr ',' argumentList               { buildList(shared_ptr<Node>($1), $3); $$ = $3;}
+        | nonEmptyArgList ',' expr                { buildList($1, shared_ptr<Node>($3)); $$ = $1;}
         ;
 
-declare:
-        TYPE declareList ';'                   {$$ = declare($1, $2);}
-        | TYPE VARIABLE '(' parameterList ')' ';'   {$$ = declare($1, $2, $4);}
 
 declareVar:
-        reference variable                            {}
-        | reference variable '=' expr                 {}
+        variable                            {$$ = $1;} //TODO implement declare var
+        |variable '=' expr                 {$$ = opr(DECLARE_VARIABLE, {$1, $3});}
         ;
 
 declareList:
-        declareVar
-        | declareList ',' declareVar        {}
+        declareVar                          {$$ = buildList(shared_ptr<Node>($1));}
+        | declareList ',' declareVar        {buildList($1, shared_ptr<Node>($3)); $$ = $1;}
 
 subscriptions:
         |                                   {$$ = 0;}
@@ -144,31 +133,31 @@ subscriptions:
 
 subscriptionList:
         '[' expr ']'                        {$$ = buildList(shared_ptr<Node>($2));}
-        |  '[' expr ']' subscriptionList      {buildList(shared_ptr<Node>($2), $4); $$ = $4;}
+        |  '[' expr ']' subscriptionList      {buildList($4, shared_ptr<Node>($2)); $$ = $4;}
         ;
 stmt:
-          ';'                                 { $$ = opr(';', {}); }
+          ';'                                 { $$ = stmt(';', {}); }
         | expr ';'                            { $$ = $1; dynamic_cast<ExprNode>($$)->inStmt();}
-        | variable '=' expr ';'                   { $$ = opr('=', {$1, $3});}
-        | FOR '(' stmt stmt stmt ')' stmt     { $$ = opr(FOR, {$3, $4, $5, $7});}
-        | WHILE '(' expr ')' stmt             { $$ = opr(WHILE, {$3, $5});}
-        | IF '(' expr ')' stmt %prec IFX      {  $$ = opr(IF, {$3, $5});}
-        | IF '(' expr ')' stmt ELSE stmt      { $$ = opr(IF, {$3, $5, $7});}
-        | '{' stmtList '}'                   { $$ = $2;}
-        | BREAK                               { $$ = opr(BREAK, {});}
-        | CONTINUE                            { $$ = opr(CONTINUE, {});}
-        | RETURN expr ';'                     { $$ = opr(RETURN, {$2});}
-        | RETURN ';'                          { $$ = opr(RETURN, {});}  
-        | TYPE declareList ';'                   {$$ = declare($1, $2);}
-        | TYPE VARIABLE '(' parList ')' ';'   {$$ = declare($1, $2, $4);}
-        | TYPE VARIABLE '(' parList ')' '{' stmtList '}'    { $$ = define($1, $2, $4, $7);}
+        | TYPE declareList ';'                   {$$ = declare($1, $2);} //TODO implement declare
+        | FOR '(' stmt stmt stmt ')' stmt     { $$ = stmt(FOR, {$3, $4, $5, $7});}
+        | WHILE '(' expr ')' stmt             { $$ = stmt(WHILE, {$3, $5});}
+        | IF '(' expr ')' stmt %prec IFX      {  $$ = stmt(IF, {$3, $5});}
+        | IF '(' expr ')' stmt ELSE stmt      { $$ = stmt(IF, {$3, $5, $7});}
+        | '{' stmtList '}'                    { $$ = stmt(STMT_LIST, $2);}
+        | BREAK                               { $$ = stmt(BREAK, {});}
+        | CONTINUE                            { $$ = stmt(CONTINUE, {});}
+        | RETURN expr ';'                     { $$ = stmt(RETURN, {$2});}
+        | RETURN ';'                          { $$ = stmt(RETURN, {});}  
+        | declare                             {$$ = $1;}
+        | TYPE VARIABLE '(' parList ')' '{' stmtList '}'    { $$ = define($1, $2, $4, stmt(STMT_LIST, $7));}
         ;
 
 constant:
         INTEGER                     { $$ = con($1);}
         | STRING                    { $$ = con($1);}
         | CHARACTER                 { $$ = conChar($1);}
-
+        | BOOLEAN                   { $$ = boolean($1);}
+        ;
 variable:
         VARIABLE                { $$ = id($1);}
         | '@' VARIABLE          { $$ = id($2, true);}
@@ -178,7 +167,7 @@ variable:
 
 stmtList:
           stmt                  { $$ =buildList(shared_ptr<Node>($1));}
-        | stmtList stmt        {buildList(shared_ptr<Node>($1), $2); $$ = $2;}
+        | stmtList stmt        {buildList($2, shared_ptr<Node>($1)); $$ = $2;}
         ;
 expr:
         constant                   {$$ = $1;}
@@ -203,13 +192,9 @@ expr:
         | expr AND expr            { $$ = opr(AND, {$1, $3}); }
         | expr OR expr            { $$ = opr(OR, {$1, $3}); }
         | '(' expr ')'          { $$ = $2; }
-        | VARIABLE '(' argumentList ')' {$$ = call($1, $3);}
+        | VARIABLE '(' argList ')' {$$ = call($1, $3);}
         ;
 %%
-
-#define SIZEOF_NODETYPE ((char *)&p->con - (char *)p)
-
-
 
 
 Node * con(int value) {
@@ -228,27 +213,26 @@ Node * con(const string * value) {
     return p;
 }
 
+Node * boolean(bool b) {
+    return new BoolNode(b);
+}
+
 Node * opr(int oper, const vector<Node *>& op) {
     auto v = vector<shared_ptr<Node> >();
     for (const auto i: op) {
         v.push_back(shared_ptr<Node>(i));
     }
-    return new OprNode(oper, v);
+    return new ExprNode(oper, v);
 }
 
-Node * stmt(int oper, const vector<Node *>* op) {
+
+Node * stmt(int oper, const vector<Node *>& op) {
     auto v = vector<shared_ptr<Node> >();
     for (const auto i: op) {
         v.push_back(shared_ptr<Node>(i));
     }
     return new StmtNode(oper, v);
 }
-
-Node * stmt(const list<shared_ptr<Node> >& l) {
-    auto v = vector<shared_ptr<Node>>(l.begin(), l.end());
-    return new StmtNode(0, v);
-}
-
 
 list<shared_ptr<Node> > * buildList() {
     return new list<shared_ptr<Node> >();
@@ -259,8 +243,8 @@ list<shared_ptr<Node> > * buildList(shared_ptr<Node> p) {
     l->push_back(p);
     return l;
 }
-void buildList(shared_ptr<Node>n , list<shared_ptr<Node> > * l) {
-    l->push_front(n);
+void buildList(list<shared_ptr<Node> > * l, shared_ptr<Node>n) {
+    l->push_back(n);
 }
 
 Node * define(const string * name, list<shared_ptr<Node> > * parameters, Node * stmts) {
@@ -302,6 +286,7 @@ Node * id(const string * name, bool isGlobal, list<shared_ptr<Node> > * subscrip
     return v;
 }
 
+
 Node * call(const string * name, list<shared_ptr<Node> > * arguments) {
     int i;
     if (nameMap.count(*name) == 0) {
@@ -324,6 +309,9 @@ void init() {
     }
 }
 
+Node* declare(VALUE_TYPE t, list<shared_ptr<Node> >* l) {
+    
+}
 
 
 int main(int argc, const char *argv[]) {

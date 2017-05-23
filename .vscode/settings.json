@@ -30,5 +30,11 @@
         "typeinfo": "cpp",
         "utility": "cpp",
         "functional": "cpp"
+    },
+    "[cpp]": {
+        "editor.quickSuggestions": false
+    },
+    "[c]": {
+        "editor.quickSuggestions": false
     }
 }
