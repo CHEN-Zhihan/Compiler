@@ -14,33 +14,30 @@ using std::shared_ptr;
 using std::list;
 
 enum VALUE_TYPE {
-    UNKNOWN = -2, STRING = -3, INT = -4, BOOL = -5, CHAR = -6, VOID = -7
+    UNKNOWN = -2, STR = -3, INT = -4, BOOL = -5, CHAR = -6, VOID = -7
 };
-
-
-class TypeNode {
-  public:
-    TypeNode(VALUE_TYPE, const vector<int>&, bool declare);
-    bool operator==(const TypeNode&);
-private:
-    VALUE_TYPE type;
-    const vector<int> dimensions;
-    bool declare;
-};
-
 
 class Node {
   public:
-    Node() = default;
+    Node();
+    Node(VALUE_TYPE);
     virtual void ex(int, int, int) const = 0;
     virtual void check(vector<int> &, int) const = 0;
     virtual ~Node() { ; };
-private:
+protected:
     VALUE_TYPE type; 
 };
 
-class ConNode : public Node {
+class ValueNode {
   public:
+    void inStmt();
+  protected:
+    bool inStatement;
+};
+
+class ConNode : public ValueNode, public Node {
+  public:
+    ConNode(VALUE_TYPE);
     virtual void ex(int, int, int) const = 0;
     void check(vector<int> &, int) const { ; }
 };
@@ -92,28 +89,30 @@ class OprNode : public Node {
 
 class IDNode : public Node {
   public:
-    IDNode(int);
+    IDNode(int, VALUE_TYPE t=UNKNOWN);
     int getID() const;
   protected:
     int i;
 };
 
-class DeclareNode : public IDNode { // denote the local variable declared.
+class DeclareNode : public Node { // denote the local variable declared.
   public:
     DeclareNode(Node * variable, Node * initializer=nullptr);
     void setType(VALUE_TYPE);
+    void ex(int, int, int) const;
+    void check(vector<int>&, int) const;
   private:
-    const vector<int> dimensions;
+    shared_ptr<Node> variable;
     shared_ptr<Node> initializer;
 };
 
-class FunctionParameterDeclareNode : public IDNode { // denote the parameter in function definition.
+class ParameterNode : public IDNode { // denote the parameter in function definition.
   public:
-    FunctionParameterDeclareNode(VALUE_TYPE, int, int);
-
+    ParameterNode(VALUE_TYPE, int, int);
+    void ex(int, int, int) const;
+    void check(vector<int> &, int) const;
   private:
-    VALUE_TYPE type;
-
+    int dimensions;
 };
 
 
@@ -133,19 +132,13 @@ class VarNode : public IDNode {
     void push(int) const;
 };
 
-class ArrayNode: public VarNode {
 
-};
-
-class ExprNode : public OprNode {
+class ExprNode : public OprNode, public ValueNode {
   public:
     ExprNode(int, const vector<shared_ptr<Node>> &);
     void ex(int, int, int) const;
     void check(vector<int> &, int) const;
-    void inStmt();
     void initialize();
-  private:
-    bool inStatement;
 };
 
 
@@ -160,8 +153,8 @@ class StmtNode : public OprNode {
 
 class FunctionNode : public IDNode {
   public:
-    FunctionNode(int, const list<shared_ptr<VarNode>>,
-                 const shared_ptr<Node> &);
+    FunctionNode(VALUE_TYPE, int, const list<shared_ptr<VarNode>>,
+                 const vector<shared_ptr<Node> > &);
     void ex(int, int, int) const;
     void check(vector<int> &, int) const;
     size_t getNumParameters() const;
@@ -171,10 +164,10 @@ class FunctionNode : public IDNode {
   private:
     int origin;
     list<shared_ptr<VarNode>> parameters;
-    shared_ptr<Node> stmts;
+    const vector<shared_ptr<Node>> stmts;
 };
 
-class CallNode : public IDNode {
+class CallNode : public IDNode, public ValueNode {
   public:
     CallNode(int, const list<shared_ptr<Node>>);
     void ex(int, int, int) const;

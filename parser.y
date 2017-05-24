@@ -32,12 +32,12 @@ Node* con(const string * value);
 Node* conChar(const string * value);
 Node* boolean(bool);
 Node* id(const string *, bool isGlobal=false, list<shared_ptr<Node> > * l=nullptr);
-Node* stmt(int, const vector<Node*>*);
+Node* stmt(int, const vector<Node*>&);
+Node* stmt(list<shared_ptr<Node>>*);
 Node* call(const string *, list<shared_ptr<Node> >*);
-Node* define(const string *, list<shared_ptr<Node> >*, Node*);
-Node* declare(VALUE_TYPE, list<shared_ptr<Node> >*);
+Node* define(VALUE_TYPE, const string *, list<shared_ptr<Node> >*, list<shared_ptr<Node>>*);
 Node* parameter(VALUE_TYPE, const string *, int);
-list<shared_ptr<Node> > * buildList()
+list<shared_ptr<Node> > * buildList();
 list<shared_ptr<Node> > * buildList(shared_ptr<Node>);
 void buildList(list<shared_ptr<Node> > *, shared_ptr<Node>);
 void run(shared_ptr<Node> p);
@@ -58,7 +58,7 @@ constexpr int STMT_LIST = -1;
     const string * cValue;
     const string * sValue;
     const string * variable;
-    VALUE_TYPE t;
+    VALUE_TYPE type;
     Node * nPtr;             /* node pointer */
     list<shared_ptr<Node> > * lists;
 };
@@ -68,8 +68,8 @@ constexpr int STMT_LIST = -1;
 %token <sValue> STRING
 %token <bValue> BOOLEAN
 %token <variable> VARIABLE
-%token <t> TYPE
-%token FOR WHILE IF PRINT READ BREAK CONTINUE END RETURN DEF INC DEC NEXT
+%token <type> TYPE
+%token FOR WHILE IF BREAK CONTINUE END RETURN INC DEC
 %nonassoc IFX
 %nonassoc ELSE
 
@@ -78,33 +78,35 @@ constexpr int STMT_LIST = -1;
 %left GE LE EQ NE '>' '<'
 %left '+' '-' POSINC PREINC POSDEC PREDEC
 %left '*' '/' '%'
+%right '='
 %nonassoc UMINUS
 
-%type <nPtr> stmt expr variable constant
-%type <lists> argList parList subscriptionList stmtList nonEmptyParList nonEmptyArgList
-%type <dimension> subscriptions
+%type <nPtr> stmt expr variable constant declareVar
+%type <lists> argList parList subscriptionList stmtList nonEmptyParList nonEmptyArgList declareList
+%type <dimension> subscriptions nonEmptySubscriptions
 %%
 
 
 program:
         stmtList END                          {
-                                                    run(shared_ptr<Node>(stmt($1)));
+                                                   // run(shared_ptr<Node>(stmt($1)));
+                                                    cout << "success!" << endl;
                                                     exit(0);
                                                 }
         ;
 
 parList:
-        |                         {$$ = buildList();}
+                                 {$$ = buildList();}
         | nonEmptyParList                    {$$ = $1;}
         ;
 
 nonEmptyParList:
         TYPE VARIABLE subscriptions                          { $$ = buildList(shared_ptr<Node>(parameter($1, $2, $3)));}
-        | nonEmptyParList ','  TYPE VARIABLE subscriptions        { buildList(shared_ptr<Node>($1, parameter($3, $4, $5))); $$ = $1;}
+        | nonEmptyParList ','  TYPE VARIABLE subscriptions        { buildList($1, shared_ptr<Node>(parameter($3, $4, $5))); $$ = $1;}
         ;
 
 argList:
-        |                         {$$ = buildList();}
+                                 {$$ = buildList();}
         | nonEmptyArgList                   {$$ = $1;}
         ;
 
@@ -125,9 +127,13 @@ declareList:
         | declareList ',' declareVar        {buildList($1, shared_ptr<Node>($3)); $$ = $1;}
         ;
 subscriptions:
-        |                                   {$$ = 0;}
-        | '[' ']'                           {$$ = 1;}
-        | subscriptions '[' ']'             {$$ = $1 + 1;}
+                                           {$$ = 0;}
+        | nonEmptySubscriptions             {$$ = $1;}
+        ;
+
+nonEmptySubscriptions:
+         '[' ']'                           {$$ = 1;}
+        | nonEmptySubscriptions '[' ']'             {$$ = $1 + 1;}
         ;
 
 subscriptionList:
@@ -136,19 +142,18 @@ subscriptionList:
         ;
 stmt:
           ';'                                 { $$ = stmt(';', {}); }
-        | expr ';'                            { $$ = $1; dynamic_cast<ExprNode>($$)->inStmt();}
+        | expr ';'                            { $$ = $1; dynamic_cast<ValueNode*>($$)->inStmt();}
         | TYPE declareList ';'                   {$$ = new StmtNode($1, vector<shared_ptr<Node>>($2->begin(), $2->end())); delete $2;} //TODO implement declare
         | FOR '(' stmt stmt stmt ')' stmt     { $$ = stmt(FOR, {$3, $4, $5, $7});}
         | WHILE '(' expr ')' stmt             { $$ = stmt(WHILE, {$3, $5});}
         | IF '(' expr ')' stmt %prec IFX      {  $$ = stmt(IF, {$3, $5});}
         | IF '(' expr ')' stmt ELSE stmt      { $$ = stmt(IF, {$3, $5, $7});}
-        | '{' stmtList '}'                    { $$ = stmt(STMT_LIST, $2);}
+        | '{' stmtList '}'                    { $$ = stmt($2);}
         | BREAK                               { $$ = stmt(BREAK, {});}
         | CONTINUE                            { $$ = stmt(CONTINUE, {});}
         | RETURN expr ';'                     { $$ = stmt(RETURN, {$2});}
         | RETURN ';'                          { $$ = stmt(RETURN, {});}  
-        | declare                             {$$ = $1;}
-        | TYPE VARIABLE '(' parList ')' '{' stmtList '}'    { $$ = define($1, $2, $4, stmt(STMT_LIST, $7));}
+        | TYPE VARIABLE '(' parList ')' '{' stmtList '}'    { $$ = define($1, $2, $4, $7);}
         ;
 
 constant:
@@ -160,13 +165,13 @@ constant:
 variable:
         VARIABLE                { $$ = id($1);}
         | '@' VARIABLE          { $$ = id($2, true);}
-        | '@' VARIABLE subscrptionList { $$ = id($2, true, $3);}
+        | '@' VARIABLE subscriptionList { $$ = id($2, true, $3);}
         | VARIABLE subscriptionList     {$$ = id($1, false, $2);}
         ;
 
 stmtList:
           stmt                  { $$ =buildList(shared_ptr<Node>($1));}
-        | stmtList stmt        {buildList($2, shared_ptr<Node>($1)); $$ = $2;}
+        | stmtList stmt        {buildList($1, shared_ptr<Node>($2)); $$ = $1;}
         ;
 expr:
         constant                   {$$ = $1;}
@@ -180,10 +185,10 @@ expr:
         | expr '/' expr         { $$ = opr('/', {$1, $3}); }
         | expr '<' expr         { $$ = opr('<', {$1, $3}); }
         | expr '>' expr         { $$ = opr('>', {$1, $3}); }
-        | expr  INC             { $$ = opr(POSINC, {$1});}
-        | expr DEC             { $$ = opr(POSDEC, {$1});}
-        | INC expr             { $$ = opr(PREINC, {$2});}
-        | DEC expr             { $$ = opr(PREDEC, {$2});}
+        | variable  INC             { $$ = opr(POSINC, {$1});}
+        | variable DEC             { $$ = opr(POSDEC, {$1});}
+        | INC variable             { $$ = opr(PREINC, {$2});}
+        | DEC variable             { $$ = opr(PREDEC, {$2});}
         | expr GE expr          { $$ = opr(GE, {$1, $3}); }
         | expr LE expr          { $$ = opr(LE, {$1, $3}); }
         | expr NE expr          { $$ = opr(NE, {$1, $3}); }
@@ -232,7 +237,11 @@ Node * stmt(int oper, const vector<Node *>& op) {
     }
     return new StmtNode(oper, v);
 }
-
+Node* stmt(list<shared_ptr<Node>>* stmts) {
+    auto v = vector<shared_ptr<Node> >(stmts->begin(), stmts->end());
+    delete stmts;
+    return new StmtNode(STMT_LIST, v);
+}
 list<shared_ptr<Node> > * buildList() {
     return new list<shared_ptr<Node> >();
 }
@@ -254,7 +263,7 @@ int getID(const string * name) {
     return nameMap[*name];
 }
 
-Node * define(const string * name, list<shared_ptr<Node> > * parameters, Node * stmts) {
+Node * define(VALUE_TYPE t, const string * name, list<shared_ptr<Node> > * parameters, list<shared_ptr<Node> > * stmts) {
     int i = getID(name);
     if (functionSet.count(i) != 0) {
         cerr << "Redefinition of function: " << *name << endl;
@@ -264,9 +273,11 @@ Node * define(const string * name, list<shared_ptr<Node> > * parameters, Node * 
     for (const auto & i : *parameters) {
         varPar.push_back(dynamic_pointer_cast<VarNode>(i));
     }
-    auto p = new FunctionNode(i, varPar, shared_ptr<Node>(stmts));
+    auto v = vector<shared_ptr<Node>>(stmts->begin(), stmts->end());
+    auto p = new FunctionNode(t, i, varPar, v);
     delete name;
     delete parameters;
+    delete stmts;
     return p;
 }
 
@@ -275,8 +286,10 @@ Node * id(const string * name, bool isGlobal, list<shared_ptr<Node> > * subscrip
     int i = getID(name);
     delete name;
     auto s = list<shared_ptr<Node>>();
-    for (const auto & i : *subscriptions) {
-        s.push_back(i);
+    if (subscriptions != nullptr) {
+        for (const auto & i : *subscriptions) {
+            s.push_back(i);
+        }
     }
     auto v = new VarNode(i, isGlobal, s);
     delete subscriptions;
@@ -293,8 +306,10 @@ Node * call(const string * name, list<shared_ptr<Node> > * arguments) {
     return p;
 }
 
-Node* parameter(VALUE_TYPE, const string *, int) {
-
+Node* parameter(VALUE_TYPE t, const string * name, int dimension) {
+    int i = getID(name);
+    delete name;
+    return new ParameterNode(t, i, dimension);
 }
 
 void init() {

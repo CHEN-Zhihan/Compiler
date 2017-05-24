@@ -90,9 +90,10 @@ void yyerror(char *);
 \/\/.*\n    ;    /* skip comments */
 [ \t\n]+    ;       /* ignore whitespace */
 "int "      {yylval.type = INT; return TYPE;}
-"string "      {yylval.type = STRING; return TYPE;}
+"string "      {yylval.type = STR; return TYPE;}
 "char "      {yylval.type = CHAR; return TYPE;}
 "void "     {yylval.type = VOID; return TYPE;}
+"bool "     {yylval.type = BOOL; return TYPE;}
 .           yyerror(yytext);
 <<EOF>>     return END;
 %%
