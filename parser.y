@@ -89,8 +89,7 @@ constexpr int STMT_LIST = -1;
 
 program:
         stmtList END                          {
-                                                   // run(shared_ptr<Node>(stmt($1)));
-                                                    cout << "success!" << endl;
+                                                    run(shared_ptr<Node>(stmt($1)));
                                                     exit(0);
                                                 }
         ;

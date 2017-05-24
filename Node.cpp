@@ -23,11 +23,16 @@ using std::unordered_set;
 using std::dynamic_pointer_cast;
 using std::make_shared;
 
+#include <numeric>
+using std::accumulate;
+using std::multiplies;
+
 #define ADDSCOPE(node)                                                         \
     sList.push_back(++scopeCounter);                                           \
     variableTable[scopeCounter] = unordered_set<int>();                        \
     node->check(sList, functionBase);                                          \
     sList.pop_back();
+
 
 static int lbl = 0;
 static int scopeCounter = 1;
@@ -36,12 +41,14 @@ int GLOBAL = 0;
 extern unordered_map<int, string> operatorInstruction;
 extern unordered_map<int, int> functionLabel;
 extern unordered_map<int, pair<int, unordered_map<int, int>>> addressTable;
+map<pair<int, int>, pair<VALUE_TYPE, vector<int> > > typeTable;
 extern unordered_map<int, const FunctionNode *> functionTable;
 extern unordered_map<int, unordered_set<int>> variableTable;
 extern vector<string> reverseLookup;
 
 Node::Node():type(UNKNOWN){;}
 Node::Node(VALUE_TYPE t):type(t){;}
+VALUE_TYPE Node::getType() const {return type;}
 ConNode::ConNode(VALUE_TYPE t):Node(t){;}
 StrNode::StrNode(const string &v) : ConNode(STR), value(v) { ; }
 void StrNode::ex(int bl, int cl, int func) const {
@@ -54,6 +61,7 @@ void CharNode::ex(int bl, int cl, int func) const {
 }
 
 IntNode::IntNode(const int &i) : ConNode(INT), value(i) { ; }
+int IntNode::getValue() const {return value;}
 BoolNode::BoolNode(bool b):ConNode(BOOL), value(b){;}
 void BoolNode::ex(int, int, int) const  {
     cout << "\tpush\t" << value << "\n";
@@ -75,12 +83,20 @@ OprNode::OprNode(int oper, const vector<shared_ptr<Node>> &op)
 }
 
 ExprNode::ExprNode(int oper, const vector<shared_ptr<Node>>& op):OprNode(oper, op) {;}
+bool ExprNode::isKnown() const {return known;}
+int ExprNode::getValue() const {return value;}
 void ExprNode::ex(int blbl, int clbl, int function) const {
+    if (known&&!inStatement) {
+        printf("\t%d\n", value);
+        return;
+    }
     switch(oper) {
     case '=': {
         op[1]->ex(blbl, clbl, function);
-        if (VarNode *v = dynamic_cast<VarNode *>(op[0].get())) {
-            v->pop(function);
+        auto v = dynamic_pointer_cast<VarNode>(op[0]);
+        v->pop(function);
+        if (!inStatement) {
+            v->push(function);
         }
         break;
     } case UMINUS: {
@@ -130,15 +146,80 @@ void ExprNode::ex(int blbl, int clbl, int function) const {
 }
 
 void ExprNode::check(vector<int>& sList, int functionBase) const {
-    if (oper == '=') {
-        op[1]->check(sList, functionBase);
-        dynamic_cast<VarNode *>(op[0].get())->assign(sList, functionBase);
-    } else {
-        for (const auto &i : op) {
-            i->check(sList, functionBase);
-        }
+    for (const auto & i : op) {
+        i->check(sList, functionBase);
     }
 }
+
+void ExprNode::evaluate(vector<int> & sList, int functionBase) {
+    vector<int> stack;
+    for (const auto & i : op) {
+        auto intNode = dynamic_pointer_cast<IntNode>(i);
+        auto exprNode = dynamic_pointer_cast<ExprNode>(i);
+        if (intNode != nullptr) {
+            stack.push_back(intNode->getValue());
+        } else if (exprNode!= nullptr) {
+            exprNode->evaluate(sList, functionBase);
+            if (!exprNode->isKnown()) {
+                known = false;
+                return;
+            }
+            stack.push_back(exprNode->getValue());
+        } else {
+            known = false;
+            return;
+        }
+    }
+    int result = 0;
+    switch (oper) {
+        case '+': {
+            result = stack[0] + stack[1];
+            break;
+        } case '-': {
+            result = stack[0] - stack[1];
+            break;
+        } case '*': {
+            result = stack[0] * stack[1];
+            break;
+        } case '/': {
+            result = stack[0] / stack[1];
+            break;
+        } case '%': {
+            result = stack[0] % stack[1];
+            break;
+        } case UMINUS: {
+            result = -stack[0];
+            break;
+        } case '>': {
+            result = stack[0] > stack[1];
+            break;
+        } case '<': {
+            result = stack[0] < stack[1];
+            break;
+        } case GE: {
+            result = stack[0] >= stack[1];
+            break;
+        } case LE: {
+            result = stack[0] <= stack[1];
+            break;
+        } case EQ: {
+            result = stack[0] == stack[1];
+            break;
+        } case NE: {
+            result = stack[0] != stack[1];
+            break;
+        } case AND: {
+            result = stack[0] && stack[1];
+            break;
+        } case OR: {
+            result = stack[0] || stack[1];
+            break;
+        }
+    }
+    value = result;
+    known = true;
+}
+
 
 void ValueNode::inStmt() {
     inStatement = true;
@@ -208,6 +289,11 @@ void StmtNode::ex(int blbl, int clbl, int function) const {
         printf("\tret\n");
         break;
     }
+    default: {
+        for (const auto & i : op) {
+            i->ex(blbl, clbl, function);
+        }
+    }
     }
 }
 void StmtNode::check(vector<int> &sList, int functionBase) const {
@@ -247,6 +333,11 @@ void StmtNode::check(vector<int> &sList, int functionBase) const {
             ADDSCOPE(op[2]);
         }
         break;
+    }
+    default: {
+        for (const auto & i : op) {
+            i->check(sList, functionBase);
+        }
     }
     }
 }
@@ -305,6 +396,7 @@ void FunctionNode::check(vector<int> &sList, int base) const {
         }
         duplicateSet.insert((*j)->getID());
         variableTable[i].insert((*j)->getID());
+        typeTable[{i, (*j)->getID()}] = {type, {}};
 #if DEBUG
         cerr << "add variable " << j->getID() << " to " << i << endl;
 #endif
@@ -351,10 +443,8 @@ void CallNode::check(vector<int> &sList, int functionBase) const {
                 cerr << "Invalid call to function " << reverseLookup[i] << endl;
                 exit(-1);
             }
-            var->assign(sList, functionBase);
-        } else {
-            first->check(sList, functionBase);
         }
+        first->check(sList, functionBase);
     } else {
         if (functionTable.count(i) == 0) {
             cerr << "Call to undefined function: " << reverseLookup[i] << endl;
@@ -379,6 +469,9 @@ void CallNode::check(vector<int> &sList, int functionBase) const {
 }
 
 VarNode::VarNode(int i, bool global, const list<shared_ptr<Node>>& s) : IDNode(i), global(global), subscriptions(s) { ; }
+void VarNode::setType(VALUE_TYPE t) {
+    type = t;
+}
 
 void VarNode::push(int function) const {
     if (global or function == GLOBAL) {
@@ -398,39 +491,58 @@ void VarNode::pop(int function) const {
 
 void VarNode::ex(int blbl, int clbl, int function) const { push(function); }
 
-void VarNode::assign(vector<int> &sList, int functionBase) const {
+void VarNode::declare(vector<int> &sList, int functionBase) const {
     if (functionTable.count(i) != 0) {
         cerr << "Redefinition of function: " << reverseLookup[i] << endl;
         exit(-1);
-    }
-    if (global) {
+    } if (global) {
         if (sList[functionBase] == GLOBAL) {
             cerr << "Refer to global variable " << reverseLookup[i]
                  << " in the global scope" << endl;
             exit(-1);
         }
-        if (variableTable[GLOBAL].count(i) == 0) {
-            variableTable[GLOBAL].insert(i);
-            addressTable[GLOBAL].second[i] = addressTable[GLOBAL].first++;
+        if (variableTable[GLOBAL].count(i) != 0) {
+            cerr << "Redefinition of global variable " << reverseLookup[i] << endl;
+            exit(-1);
         }
+        variableTable[GLOBAL].insert(i);
+        addressTable[GLOBAL].second[i] = addressTable[GLOBAL].first++;
     } else {
-        int s = getDefinitionScope(sList, functionBase);
-        if (s == -1) {
-            if (addressTable[sList[functionBase]].second.count(i) == 0) {
-                auto size = addressTable[sList[functionBase]].first++;
-                if (sList[functionBase] != GLOBAL) {
-                    size -=
-                        functionTable[sList[functionBase]]->getNumParameters();
-                }
-                addressTable[sList[functionBase]].second[i] = size;
-            }
-            variableTable[sList.back()].insert(i);
-#if DEBUG
-            cerr << "add variable " << i << " to " << sList.back() << endl;
-#endif
+        if (variableTable[sList.back()].count(i) != 0) {
+            cerr << "Redefinition of variable " << reverseLookup[i] << endl;
+            exit(-1);
         }
+        variableTable[sList.back()].insert(i);
+        int size = accumulate(subscriptions.begin(), subscriptions.end(), 1, [&sList, functionBase, this]
+            (int left, shared_ptr<Node> right) -> int {
+                auto temp = dynamic_pointer_cast<ExprNode>(right);
+                int value = 0;
+                if (temp != nullptr) {
+                    temp->evaluate(sList, functionBase);
+                    value = temp->getValue();
+                } else {
+                    auto intNode = dynamic_pointer_cast<IntNode>(right);
+                    if (intNode != nullptr) {
+                        value = intNode->getValue();
+                    } else {
+                        cerr << "invalid size of array " << reverseLookup[i] << endl;
+                        exit(-1);
+                    }
+                }
+                if (value <= 0) {
+                    cerr << "invalid size of array " << reverseLookup[i] << endl;
+                    exit(-1);
+                }
+                return left * value;
+        });
+        addressTable[sList[functionBase]].second[i] = addressTable[sList[functionBase]].first;
+        addressTable[sList[functionBase]].first += size;
+#if DEBUG
+        cerr << "add variable " << i << " to " << sList.back() << endl;
+#endif
     }
 }
+
 
 int VarNode::getDefinitionScope(const vector<int> &sList,
                                 int functionBase) const {
@@ -465,16 +577,27 @@ void VarNode::check(vector<int> &sList, int functionBase) const {
 }
 
 DeclareNode::DeclareNode(Node* variable, Node* initializer) {
-    this->variable = shared_ptr<Node>(variable);
+    this->variable = shared_ptr<VarNode>(dynamic_cast<VarNode*>(variable));
     this->initializer = shared_ptr<Node>(initializer);
 }
 
-void DeclareNode::check(vector<int>&, int) const {
-    ;
+void DeclareNode::setType(VALUE_TYPE t) {
+    type = t;
+    variable->setType(t);
+}
+
+void DeclareNode::check(vector<int>& sList, int functionBase) const {
+    if (initializer != nullptr) {
+        initializer->check(sList, functionBase);
+    }
+    variable->declare(sList, functionBase);
 }
 
 void DeclareNode::ex(int blbl, int clbl, int function) const  {
-    ;
+    if (initializer != nullptr) {
+        initializer->ex(blbl, clbl, function);
+        variable->pop(function);
+    }
 }
 
 ParameterNode::ParameterNode(VALUE_TYPE v, int i, int dimensions):IDNode(i, v), dimensions(dimensions) {

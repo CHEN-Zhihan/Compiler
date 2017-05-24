@@ -24,6 +24,7 @@ class Node {
     virtual void ex(int, int, int) const = 0;
     virtual void check(vector<int> &, int) const = 0;
     virtual ~Node() { ; };
+    VALUE_TYPE getType() const;
 protected:
     VALUE_TYPE type; 
 };
@@ -64,7 +65,7 @@ class IntNode : public ConNode {
   public:
     IntNode(const int &);
     void ex(int, int, int) const;
-
+    int getValue() const;
   private:
     const int value;
 };
@@ -95,16 +96,7 @@ class IDNode : public Node {
     int i;
 };
 
-class DeclareNode : public Node { // denote the local variable declared.
-  public:
-    DeclareNode(Node * variable, Node * initializer=nullptr);
-    void setType(VALUE_TYPE);
-    void ex(int, int, int) const;
-    void check(vector<int>&, int) const;
-  private:
-    shared_ptr<Node> variable;
-    shared_ptr<Node> initializer;
-};
+
 
 class ParameterNode : public IDNode { // denote the parameter in function definition.
   public:
@@ -114,33 +106,46 @@ class ParameterNode : public IDNode { // denote the parameter in function defini
   private:
     int dimensions;
 };
-
-
-class VarNode : public IDNode {
-  public:
-    VarNode(int, bool, const list<shared_ptr<Node>> &);
-    virtual void ex(int, int, int) const;
-    virtual void check(vector<int> &, int) const;
-    virtual void assign(vector<int> &, int) const;
-    virtual void pop(int) const;
-    void setType(VALUE_TYPE);
-  private:
-    bool global;
-    shared_ptr<Node> initializer;
-    list<shared_ptr<Node>> subscriptions;
-    int getDefinitionScope(const vector<int> &, int) const;
-    void push(int) const;
-};
-
-
 class ExprNode : public OprNode, public ValueNode {
   public:
     ExprNode(int, const vector<shared_ptr<Node>> &);
     void ex(int, int, int) const;
     void check(vector<int> &, int) const;
-    void initialize();
+    void evaluate(vector<int> &, int);
+    int getValue() const;
+    bool isKnown() const;
+  private:
+    int value;
+    bool known;
 };
 
+class VarNode : public IDNode {
+  public:
+    VarNode(int, bool, const list<shared_ptr<Node>> &);
+    void ex(int, int, int) const;
+    void check(vector<int> &, int) const;
+    void declare(vector<int> &, int) const;
+    void pop(int) const;
+    void setType(VALUE_TYPE);
+    void push(int) const;   
+  private:
+    bool global;
+    list<shared_ptr<Node>> subscriptions;
+    int getDefinitionScope(const vector<int> &, int) const;
+};
+
+
+
+class DeclareNode : public Node { // denote the local variable declared.
+  public:
+    DeclareNode(Node * variable, Node * initializer=nullptr);
+    void setType(VALUE_TYPE);
+    void ex(int, int, int) const;
+    void check(vector<int>&, int) const;
+  private:
+    shared_ptr<VarNode> variable;
+    shared_ptr<Node> initializer;
+};
 
 class StmtNode : public OprNode {
   public:

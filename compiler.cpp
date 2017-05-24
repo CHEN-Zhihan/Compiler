@@ -11,6 +11,7 @@ using std::list;
 #include <vector>
 using std::vector;
 using std::pair;
+using std::tuple;
 
 #include <unordered_map>
 using std::unordered_map;
@@ -30,8 +31,7 @@ extern int GLOBAL;
 extern vector<string> reverseLookup; /* maps a variable identifier to a name*/
 unordered_map<int, const FunctionNode *>
     functionTable; /* maps a function ID to the node it corresponds to*/
-unordered_map<scope, unordered_set<int>>
-    variableTable; /*maps a scope to the set of visible variables*/
+unordered_map<int, unordered_set<int> > variableTable; /*maps a scope to the set of visible variables*/
 unordered_map<int, string>
     operatorInstruction; /*maps an operator to the instruction to be printed*/
 unordered_map<int, int>
@@ -47,7 +47,7 @@ void defineFunctions() {
     for (const auto &FID : functionLabel) {
         auto func = functionTable[FID.first];
         int tempVariables =
-            int(variableTable[FID.first].size() - func->getNumParameters());
+            int(addressTable[FID.first].first - func->getNumParameters());
         printf("L%03d:\n", FID.second);
         if (tempVariables != 0) {
             printf("\tpush\t%d\n", tempVariables);
