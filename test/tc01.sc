@@ -1,5 +1,5 @@
 // integer test 
-geti(a);
+a = geti();
 b = a;
 c = 99999;
 puti_(b);

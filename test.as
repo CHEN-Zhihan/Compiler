@@ -1,31 +1,40 @@
 	push	sp
-	push	2
+	push	3
 	add
 	pop	sp
-	push	0
-	pop	sb[0]
-	push	0
-	pop	sb[1]
-L000:
-	push	sb[1]
-	push	10
-	compNE
+	push	"Please enter a +ve int <= 12: "
+	puts_
+	geti
+	pop	sb[2]
+	push	sb[2]
+	push	12
+	compLE
 	j0	L001
-	push	sb[1]
+	push	sb[2]
+	call	L000, 1
 	puti
-	push	sb[0]
+	jmp	L002
+L001:
+	push	sb[2]
+	puti_
+	push	" > 12!!"
+	puts
+L002:
+	end
+L000:
+	push	fp[-4]
+	push	1
+	compLT
+	j0	L003
+	push	1
+	ret
+L003:
+	push	fp[-4]
+	push	fp[-4]
 	push	1
 	sub
-	pop	sb[0]
-	push	sb[0]
-L002:
-	push	sb[1]
-	push	1
-	add
-	pop	sb[1]
-	push	sb[1]
-	jmp	L000
-L001:
-	push	sb[0]
-	puti
-	end
+	call	L000, 1
+	mul
+	ret
+	push	0
+	ret

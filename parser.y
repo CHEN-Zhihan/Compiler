@@ -28,13 +28,14 @@ using std::dynamic_pointer_cast;
 /* prototypes */
 ExprNode* expr(int, const vector<Node*> &);
 Node* stmt(int, const vector<Node*>&);
+Node* stmt(int, const vector<Node*>*);
 Node* con(int value);
 Node* con(const string * value);
 Node* conChar(const string * value);
-Node* id(const string *, bool isGlobal=false);
-Node* id(Node *, vector<Node*> *);
-Node* call(const string *, vector<Node*>*);
-Node* func(const string *, vector<Node*>*, vector<Node*>*);
+Node* boolean(bool);
+VarNode* id(const string *, bool isGlobal=false, vector<ExprNode*>* subscriptions=nullptr);
+Node* call(const string *, vector<ExprNode*>*);
+Node* func(const string *, vector<VarNode*>*, vector<Node*>*);
 void run(shared_ptr<Node> p);
 int yylex(void);
 void yyerror(char *s);
@@ -43,10 +44,11 @@ set<int> functionSet;
 set<int> callSet;
 vector<string> reverseLookup;
 static int nameCounter;
-const int STMTLIST = -1;
+const int STMT_LIST = -1;
 const int EXPR = -2;
 const int CALL = -3;
 const int FUNCTION = -4;
+const int VAR = -5;
 %}
 %debug
 %union {
@@ -57,102 +59,112 @@ const int FUNCTION = -4;
     bool bValue;
     Node * nPtr;             /* node pointer */
     ExprNode * exprNode;
-    vector<VarNode*>* varlist;
+    DeclareNode *declareNode;
+    vector<VarNode*>* varList;
     vector<ExprNode*>* exprList;
-    vector<StmtNode*>* stList;
-    vector<DeclareNode*>* declList;
+    vector<Node*>* nodeList;
 };
 
 %token <iValue> INTEGER
 %token <cValue> CHARACTER
 %token <sValue> STRING
+%token <bValue> BOOL
 %token <variable> VARIABLE
-%token FOR WHILE IF PRINT READ BREAK CONTINUE END RETURN DEF INC DEC ARRAY
+%token FOR WHILE IF PRINT READ BREAK CONTINUE END RETURN DEF ARRAY POSINC POSDEC PREINC PREDEC
 %nonassoc IFX
 %nonassoc ELSE
 
 %left AND OR
 
 %left GE LE EQ NE '>' '<'
-%left '+' '-' POSINC PREINC POSDEC PREDEC
+%right '='
+%left '+' '-' 
 %left '*' '/' '%'
+%right INC DEC
 %nonassoc UMINUS
 
-%type <nPtr> stmt variable constant
+%type <nPtr> stmt variable
+
 %type <exprNode> expr
-%type <varList> parameterList
-%type <declList> declareList
-%type <exprList> subscriptionList argumentList
-%type <stList> stmtList
+%type <varList> parameterList parList
+%type <exprList> subscriptionList argumentList argList
+%type <nodeList> stmtList declareList
+%type <declareNode> declareArr
 %%
 
 
 
 program:
         stmtList END                          {
-                                                    run(stmt(STMT_LIST, *$1));
-                                                    delete $1;
+                                                    run(shared_ptr<Node>(stmt(STMT_LIST, $1)));
                                                     exit(0);
                                                 }
         ;
 
+parList:
+                                           {$$ = new vector<VarNode*>();}
+        | parameterList                     {$$ = $1;}
+        ;
 parameterList:
         VARIABLE                          { $$ = new vector<VarNode*>{id($1)};}
-        | parameterList ',' VARIABLE        {$$ = $1;$$->push_back($3);}
-        |                                   { $$ = new vector<VarNode*>();}
+        | parameterList ',' VARIABLE        {$$ = $1;$$->push_back(id($3));}
+        ;
+
+argList:
+                                                {$$ = new vector<ExprNode*>();}
+        | argumentList                          {$$ = $1;}
         ;
 
 argumentList:
         expr                                  {$$ = new vector<ExprNode*>{$1};}
         | argumentList ',' expr               {$$ = $1;$$->push_back($3);}
-        |                                     {$$ = new vector<ExprNode*>();}
         ;
 
 declareArr:
-        variable                            {$$ = declareVar($1);}
-        | variable '=' expr                 {$$ = declareVar($1, $2);}
+        variable                            {$$ = new DeclareNode(dynamic_pointer_cast<VarNode>(shared_ptr<Node>($1)));}
+        | variable '=' expr                 {$$ = new DeclareNode(dynamic_pointer_cast<VarNode>(shared_ptr<Node>($1)), shared_ptr<ExprNode>($3));}
         ;
 
 declareList:
-        declareArr                          {$$ = new vector<DeclareNode*>{$1};}
+        declareArr                          {$$ = new vector<Node*>{$1};}
         | declareList ',' declareArr        {$$ = $1;$$->push_back($3);}
         ;
 
 subscriptionList:
-        '[' expr ']'                        {$$ = new vector<ExprNode*>{$1};}
+        '[' expr ']'                        {$$ = new vector<ExprNode*>{$2};}
         |  subscriptionList '[' expr ']'       {$$ = $1;$$->push_back($3);}
         ;
 stmt:
-          ';'                                 {$$ = stmt(';', {}); }
-        | expr ';'                            {$$ = stmt(EXPR, {$1};$1->inStmt();}
-        | ARRAY declareList                   {$$ = stmt(ARRAY, *$2;); delete $2;}
+          ';'                                 {$$ = stmt(';', vector<Node*>()); }
+        | expr ';'                            {$$ = stmt(EXPR, {$1});$1->inStmt();}
+        | ARRAY declareList ';'                  {$$ = stmt(ARRAY, $2);}
         | FOR '(' stmt stmt stmt ')' stmt     {$$ = stmt(FOR, {$3, $4, $5, $7});}
         | WHILE '(' expr ')' stmt             {$$ = stmt(WHILE, {$3, $5});}
         | IF '(' expr ')' stmt %prec IFX      {$$ = stmt(IF, {$3, $5});}
         | IF '(' expr ')' stmt ELSE stmt      {$$ = stmt(IF, {$3, $5, $7});}
-        | '{' stmtList '}'                   {$$ = stmt(STMT_LIST, *$2);delete $2;}
-        | BREAK                               {$$ = stmt(BREAK, {});}
-        | CONTINUE                            {$$ = stmt(CONTINUE, {});}
+        | '{' stmtList '}'                   {$$ = stmt(STMT_LIST, $2);}
+        | BREAK ';'                              {$$ = stmt(BREAK, vector<Node*>());}
+        | CONTINUE ';'                           {$$ = stmt(CONTINUE, vector<Node*>());}
         | RETURN expr ';'                     {$$ = stmt(RETURN, {$2});}
-        | RETURN ';'                          {$$ = stmt(RETURN, {});}  
-        | DEF VARIABLE '(' parameterList ')' '{' stmtList '}'    { $$ = stmt(FUNCTION, {func($2, $4, $7)});}
+        | RETURN ';'                          {$$ = stmt(RETURN, vector<Node*>());}
+        | DEF VARIABLE '(' parList ')' '{' stmtList '}'    { $$ = stmt(FUNCTION, {func($2, $4, $7)});}
         ;
 
 variable:
         VARIABLE                { $$ = id($1);}
         | '@' VARIABLE          { $$ = id($2, true);}
         | '@' VARIABLE subscriptionList     {$$ = id($2, true, $3);}
-        | variable subscrptionList { $$ = id($1, false, $2);}
-
+        | VARIABLE subscriptionList { $$ = id($1, false, $2);}
+        ;
 stmtList:
-          stmt                  {$$ = new vector<StmtNode*>{$1};}
+          stmt                  {$$ = new vector<Node*>();$$->push_back($1);}
         | stmtList stmt        {$$ = $1;$$->push_back($2);}
         ;
 expr:
-        | INTEGER                   {$$ = expr(INTEGER, {con($1}));}
-        | STRING                    {$$ = expr(STRING, {con($1}));}
+        INTEGER                   {$$ = expr(INTEGER, {con($1)});}
+        | STRING                    {$$ = expr(STRING, {con($1)});}
         | CHARACTER                 {$$ = expr(CHARACTER, {conChar($1)});}
-        | BOOL                      {$$ = expr(BOOL, {boolean($1}));}
+        | BOOL                      {$$ = expr(BOOL, {boolean($1)});}
         | variable                  {$$ = expr(VAR, {$1});}
         | variable '=' expr         {$$ = expr('=', {$1, $3});}
         | '-' expr %prec UMINUS { $$ = expr(UMINUS, {$2});}
@@ -163,10 +175,10 @@ expr:
         | expr '/' expr         { $$ = expr('/', {$1, $3});}
         | expr '<' expr         { $$ = expr('<', {$1, $3});}
         | expr '>' expr         { $$ = expr('>', {$1, $3});}
-        | expr  INC             { $$ = expr(POSINC, {$1});}
-        | expr DEC             { $$ = expr(POSDEC, {$1});}
-        | INC expr             { $$ = expr(PREINC, {$2});}
-        | DEC expr             { $$ = expr(PREDEC, {$2});}
+        | variable INC             { $$ = expr(POSINC, {$1});}
+        | variable DEC             { $$ = expr(POSDEC, {$1});}
+        | INC variable             { $$ = expr(PREINC, {$2});}
+        | DEC variable             { $$ = expr(PREDEC, {$2});}
         | expr GE expr          { $$ = expr(GE, {$1, $3});}
         | expr LE expr          { $$ = expr(LE, {$1, $3});}
         | expr NE expr          { $$ = expr(NE, {$1, $3});}
@@ -174,7 +186,7 @@ expr:
         | expr AND expr            { $$ = expr(AND, {$1, $3});}
         | expr OR expr            { $$ = expr(OR, {$1, $3});}
         | '(' expr ')'          { $$ = $2;}
-        | VARIABLE '(' argumentList ')' {$$ = expr(CALL, {call($1, $3)};}
+        | VARIABLE '(' argList ')' {$$ = expr(CALL, {call($1, $3)});}
         ;
 %%
 
@@ -188,11 +200,12 @@ Node * con(int value) {
 }
 
 ExprNode * expr(int oper, const vector<Node*>& v) {
-    auto a = array<shared_prt<Node>, 2>{v[0]};
-    if (v.size() == 2) {
-        a[1] = v[1];
-    }
-    return new ExprNode(oper, a);
+    auto vs = vector<shared_ptr<Node>>(v.begin(), v.end());
+    return new ExprNode(oper, vs);
+}
+
+Node* boolean(bool b) {
+    return new BoolNode(b);
 }
 
 Node * conChar(const string * value) {
@@ -207,11 +220,14 @@ Node * con(const string * value) {
     return p;
 }
 
+Node* stmt(int oper, const vector<Node*>* v) {
+    auto sList = vector<shared_ptr<Node> >(v->begin(), v->end());
+    delete v;
+    return new StmtNode(oper, sList);
+}
+
 Node * stmt(int oper, const vector<Node *>& op) {
-    auto v = vector<shared_ptr<Node> >();
-    for (const auto i: op) {
-        v.push_back(shared_ptr<Node>(i));
-    }
+    auto v = vector<shared_ptr<Node> >(op.begin(), op.end());
     return new StmtNode(oper, v);
 }
 
@@ -223,17 +239,14 @@ int getID(const string * name) {
     return nameMap[*name];
 }
 
-Node * func(const string * name, vector<VarNode*> * parameters, vector<StmtNode*>* stmts) {
+Node * func(const string * name, vector<VarNode*> * parameters, vector<Node*>* stmts) {
     int i = getID(name);
     if (functionSet.count(i) != 0) {
         cerr << "Redefinition of function: " << *name << endl;
         exit(-1);
     }
     auto varPar = vector<shared_ptr<VarNode> >(parameters->begin(), parameters->end());
-    for (const auto & i : *parameters) {
-        varPar.push_back(shared_ptr<VarNode>(i));
-    }
-    auto statements = vector<shared_ptr<StmtNode> >(stmts->begin(), stmts->end());
+    auto statements = vector<shared_ptr<Node> >(stmts->begin(), stmts->end());
     auto p = new FunctionNode(i, varPar, statements);
     delete name;
     delete parameters;
@@ -243,18 +256,22 @@ Node * func(const string * name, vector<VarNode*> * parameters, vector<StmtNode*
 
 
 
-Node * id(const string * name, bool isGlobal, vector<ExprNode*>* subscriptions) {
+VarNode * id(const string * name, bool isGlobal, vector<ExprNode*>* subscriptions) {
     int i = getID(name);
     delete name;
-    auto subs = vector<shared_ptr<ExprNode> >(subscriptions->begin(), subscriptions->end());
-    delete subscriptions;
+    auto subs = vector<shared_ptr<ExprNode> >();
+    if (subscriptions != nullptr) {
+        subs = vector<shared_ptr<ExprNode> >(subscriptions->begin(), subscriptions->end());
+        delete subscriptions;
+    }
     return new VarNode(i, isGlobal, subs);
 }
 
 Node * call(const string * name, vector<ExprNode*> * arguments) {
     int i = getID(name);
     callSet.insert(i);
-    auto p = new CallNode(i, *arguments);
+    auto argList = vector<shared_ptr<ExprNode>>(arguments->begin(), arguments->end());
+    auto p = new CallNode(i, argList);
     delete name;
     delete arguments;
     return p;

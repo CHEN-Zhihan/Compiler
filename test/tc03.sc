@@ -1,5 +1,5 @@
 // string test 
-gets(a);
+a = gets();
 b = a;
 c = "test!";
 puts_(b);

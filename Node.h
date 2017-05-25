@@ -24,31 +24,45 @@ public:
     virtual ~Node() {;};
 };
 
-class StrNode:public Node {
+class ConNode : public Node {
+public:
+    virtual void ex(int, int, int) const = 0;
+    void check(vector<int>&, int) const;
+};
+
+class StrNode:public ConNode {
 public:
     StrNode(const string&);
     void ex(int, int, int) const;
-    void check(vector<int>&, int) const;
 private:
     const string value;
 };
 
-class CharNode:public Node {
+class CharNode:public ConNode {
 public:
     CharNode(const string&);
     void ex(int, int, int) const;
-    void check(vector<int>&, int) const;    
+    int getValue() const;
 private:
     const string value;
 };
 
-class IntNode:public Node {
+class IntNode:public ConNode {
 public:
     IntNode(const int&);
     void ex(int, int, int) const;
-    void check(vector<int>&, int) const;    
+    int getValue() const;
 private:
     const int value;
+};
+
+class BoolNode: public ConNode {
+public:
+    BoolNode(bool);
+    void ex(int, int, int) const;
+    int getValue() const;
+private:
+    const bool value;
 };
 
 
@@ -58,8 +72,15 @@ public:
     void ex(int, int, int) const;
     void check(vector<int>&, int) const;
     int getOper() const;
+    void inStmt();
+    void evaluate();
+    bool isKnown() const;
+    int getValue() const;
 private:
     int oper;
+    bool inStatement;
+    int value;
+    bool known;
     array<shared_ptr<Node>, 2> op;
 };
 
@@ -84,21 +105,24 @@ protected:
 
 class VarNode: public IDNode {
 public:
-    VarNode(int, bool, vector<shared_ptr<ExprNode> > subscriptions);
+    VarNode(int, bool, const vector<shared_ptr<ExprNode> >& subscriptions);
     void ex(int, int, int) const;
     void check(vector<int>&, int) const;
     void assign(vector<int>&, int) const;
     void pop(int) const;
+    void push(int) const;
+    void declare(vector<int>&, int) const;
 private:
     bool global;
     vector<shared_ptr<ExprNode> > subscriptions;
     int getDefinitionScope(const vector<int>&, int) const;
-    void push(int) const;
+    void getOffSet(int, int, int) const;
+    vector<int> getDimension() const;
 };
 
-class ArrayDeclareNode: public Node {
+class DeclareNode: public Node {
 public:
-    ArrayDeclareNode(const shared_ptr<VarNode>&, const shared_ptr<ExprNode>&);
+    DeclareNode(const shared_ptr<VarNode>&, const shared_ptr<ExprNode> =nullptr);
     void ex(int, int, int) const;
     void check(vector<int>&, int) const;
 private:
@@ -108,7 +132,7 @@ private:
 
 class FunctionNode: public IDNode {
 public:
-    FunctionNode(int, const vector<shared_ptr<VarNode> >, const vector<shared_ptr<StmtNode>>&);
+    FunctionNode(int, const vector<shared_ptr<VarNode> >&, const vector<shared_ptr<Node>>&);
     void ex(int, int, int) const;
     void check(vector<int>&, int) const;
     size_t getNumParameters() const;
@@ -116,12 +140,12 @@ public:
     void exStmt(int, int, int) const;
 private:
     vector<shared_ptr<VarNode> > parameters;
-    vector<shared_ptr<StmtNode> > stmts;
+    vector<shared_ptr<Node> > stmts;
 };
 
 class CallNode: public IDNode {
 public:
-    CallNode(int, const vector<shared_ptr<ExprNode>>);
+    CallNode(int, const vector<shared_ptr<ExprNode>>&);
     void ex(int, int, int) const;
     void check(vector<int>&, int) const;
 private:

@@ -38,15 +38,15 @@ define all functions called at the end of code.
 void defineFunctions() {
     for (const auto& FID : functionLabel) {
         auto func = functionTable[FID.first];
-        int tempVariables = int(variableTable[FID.first].size() - func->getNumParameters());
+        int tempVariablesSize = addressTable[FID.first].first;
         printf("L%03d:\n", FID.second);
-        if (tempVariables != 0) {
-            printf("\tpush\t%d\n", tempVariables);
+        if (tempVariablesSize != 0) {
+            printf("\tpush\t%d\n", tempVariablesSize);
             printf("\tpush\tsp\n");   
             printf("\tadd\n");
             printf("\tpop\tsp\n");
         }
-        func->exStmt(998, 998, FID.first);
+        func->exStmt(FID.first, 998, 998);
         printf("\tpush\t0\n");
         printf("\tret\n");
     }
@@ -70,15 +70,15 @@ void run(shared_ptr<Node> p) {
             cerr << i << reverseLookup[i] << endl;
         }
     #endif
+    ++addressTable[GLOBAL].first; // used as a register for offset calculation.        
     p->check(sList, GLOBAL);
-
     if (addressTable[GLOBAL].first != 0) {
         printf("\tpush\tsp\n");
         printf("\tpush\t%d\n", addressTable[GLOBAL].first);
         printf("\tadd\n");
         printf("\tpop\tsp\n");
     }
-    p->ex(998, 998, GLOBAL);
+    p->ex(GLOBAL, 998, 998);
     printf("\tend\n");
     defineFunctions();
 }

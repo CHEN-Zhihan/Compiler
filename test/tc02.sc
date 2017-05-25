@@ -1,5 +1,5 @@
 // char test 
-getc(a);
+a = getc();
 b = a;
 c = 'X';
 putc_(b);

@@ -3,7 +3,7 @@ def fact(n) {
   return n * fact(n-1);
 }
 puts_("Please enter a +ve int <= 12: ");
-geti(n);
+n = geti();
 if (n <= 12) {
 	puti(fact(n));
 } else {
