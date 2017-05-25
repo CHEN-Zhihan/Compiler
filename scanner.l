@@ -43,6 +43,14 @@ void yyerror(char *);
                             if (temp == "continue") {
                                 return CONTINUE;
                             }
+                            if (temp == "true") {
+                                yylval.bValue = true;
+                                return BOOL;
+                            }
+                            if (temp == "false") {
+                                yylval.bValue = false;
+                                return BOOL;
+                            }
                             char buffer[80];
                             if (temp.size() > 12) {
                                 sprintf(buffer, "Variable length exceeds 12: %s", yytext);
@@ -81,7 +89,7 @@ void yyerror(char *);
 "||"        return OR;
 \/\/.*\n    ;    /* skip comments */
 [ \t\n]+    ;       /* ignore whitespace */
-
+"array "    return ARRAY;
 .           yyerror(yytext);
 <<EOF>>     return END;
 %%
