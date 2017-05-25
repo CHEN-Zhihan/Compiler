@@ -29,7 +29,7 @@ unordered_map<int,  const FunctionNode* >functionTable; /* maps a function ID to
 unordered_map<scope, unordered_set<int> > variableTable; /*maps a scope to the set of visible variables*/
 unordered_map<int, string> operatorInstruction; /*maps an operator to the instruction to be printed*/
 unordered_map<int, int> functionLabel; /*maps a function id to the label number*/
-unordered_map<int, pair<int, unordered_map<int, int> > >addressTable; /*maps a function to an address table it holds for local/global variables*/
+unordered_map<int, pair<int, unordered_map<int, unordered_map<int, int> > > >addressTable; /*maps a function to an address table it holds for local/global variables*/
 
 
 /*

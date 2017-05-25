@@ -47,7 +47,8 @@ const int VAR = -5;
 const int CALL = -3;
 extern unordered_map<int, string> operatorInstruction;
 extern unordered_map<int, int> functionLabel;
-extern unordered_map<int, pair<int, unordered_map<int, int> > > addressTable;
+extern unordered_map<int, pair<int, unordered_map<int, unordered_map<int, int> > > > addressTable;
+unordered_map<int, unordered_map<int, unordered_set<int> > > assignableAddress;
 map<pair<int, int>, vector<int>> sizeMap;
 extern unordered_map<int, const FunctionNode* > functionTable;
 extern unordered_map<int, unordered_set<int> > variableTable;
@@ -56,23 +57,23 @@ extern vector<string> reverseLookup;
 void ConNode::check(vector<int>&, int) const {;}
 
 StrNode::StrNode(const string& v):value(v) {;}
-void StrNode::ex(int, int, int) const {
+void StrNode::ex(vector<int>& sList, int, int, int) const {
     cout << "\tpush\t" << value << "\n";
 }
 
 BoolNode::BoolNode(bool b):value(b){;}
-void BoolNode::ex(int, int, int) const {
+void BoolNode::ex(vector<int>& sList, int, int, int) const {
     cout << "\tpush\t" << value << "\n";
 }
 int BoolNode::getValue() const {return value;}
 CharNode::CharNode(const string& v):value(v) {;}
-void CharNode::ex(int, int, int) const {
+void CharNode::ex(vector<int>& sList, int, int, int) const {
     cout << "\tpush\t" << value << "\n";
 }
 int CharNode::getValue() const {return value[1];}
 
 IntNode::IntNode(const int& i):value(i){;}
-void IntNode::ex(int, int, int) const {
+void IntNode::ex(vector<int>& sList, int, int, int) const {
     cout << "\tpush\t" << value << "\n";
 }
 int IntNode::getValue() const {return value;}
@@ -98,15 +99,15 @@ ExprNode::ExprNode(int oper, const vector<shared_ptr<Node> > &op):oper(oper) {
 void ExprNode::inStmt() {
     inStatement = true;
 }
-void ExprNode::ex(int function, int blbl, int clbl) const {
+void ExprNode::ex(vector<int>& sList, int function, int blbl, int clbl) const {
     unordered_set<int> uniOp{INTEGER, CHARACTER, STRING, BOOL, VAR, CALL};
     if (uniOp.count(oper) != 0) {
-        op[0]->ex(function, blbl, clbl);
+        op[0]->ex(sList, function, blbl, clbl);
         return;
     }
     switch (oper) {
         case '=': {
-            op[1]->ex(function, blbl, clbl);
+            op[1]->ex(sList, function, blbl, clbl);
             auto v = dynamic_pointer_cast<VarNode>(op[0]);
             v->pop(function);
             if (!inStatement) {
@@ -114,36 +115,36 @@ void ExprNode::ex(int function, int blbl, int clbl) const {
             }
             break;
         } case UMINUS: {
-            op[0]->ex(function, blbl, clbl);
+            op[0]->ex(sList, function, blbl, clbl);
             printf("\tneg\n");
             break;
         } case POSINC: {
             if (!inStatement) {
-                op[0]->ex(function, blbl, clbl);
+                op[0]->ex(sList, function, blbl, clbl);
             }
             incdec(dynamic_pointer_cast<VarNode>(op[0]), blbl, clbl, function, true);
             break;
         } case PREINC: {
             incdec(dynamic_pointer_cast<VarNode>(op[0]), blbl, clbl, function, true);
             if (!inStatement) {
-                op[0]->ex(function, blbl, clbl);
+                op[0]->ex(sList, function, blbl, clbl);
             }
             break;
         } case POSDEC: {
             if (!inStatement) {
-                op[0]->ex(function, blbl, clbl);
+                op[0]->ex(sList, function, blbl, clbl);
             }
             incdec(dynamic_pointer_cast<VarNode>(op[0]), blbl, clbl, function, false);
             break;
         } case PREDEC: {
             incdec(dynamic_pointer_cast<VarNode>(op[0]), blbl, clbl, function, false);
             if (!inStatement) {
-                op[0]->ex(function, blbl, clbl);
+                op[0]->ex(sList, function, blbl, clbl);
             }
             break;
         } default: {
-            op[0]->ex(function, blbl, clbl);
-            op[1]->ex(function, blbl, clbl);
+            op[0]->ex(sList, function, blbl, clbl);
+            op[1]->ex(sList, function, blbl, clbl);
             if (operatorInstruction.count(oper) != 0) {
                 cout << "\t" << operatorInstruction[oper] << "\n";
             }
@@ -262,7 +263,7 @@ int ExprNode::getValue() const {return value;}
 bool ExprNode::isKnown() const {return known;}
 
 StmtNode::StmtNode(int oper, const vector<shared_ptr<Node> >& op):oper(oper), op(op) {;}
-void StmtNode::ex(int function, int blbl, int clbl) const {
+void StmtNode::ex(vector<int>& sList, int function, int blbl, int clbl) const {
     int lblx, lbly, lblz;
     switch (oper) {
         case BREAK: {
@@ -275,13 +276,13 @@ void StmtNode::ex(int function, int blbl, int clbl) const {
             lblx = lbl++;
             lbly = lbl++;
             lblz = lbl++;
-            op[0]->ex(function, blbl, clbl);
+            op[0]->ex(sList, function, blbl, clbl);
             printf("L%03d:\n", lblx);
-            op[1]->ex(function, blbl, clbl);
+            op[1]->ex(sList, function, blbl, clbl);
             printf("\tj0\tL%03d\n", lbly);
-            op[3]->ex(function, lbly, lblz);
+            op[3]->ex(sList, function, lbly, lblz);
             printf("L%03d:\n", lblz);
-            op[2]->ex(function, blbl, clbl);
+            op[2]->ex(sList, function, blbl, clbl);
             printf("\tjmp\tL%03d\n", lblx);
             printf("L%03d:\n", lbly);
             break;
@@ -289,26 +290,26 @@ void StmtNode::ex(int function, int blbl, int clbl) const {
             lblx = lbl++;
             lbly = lbl++;
             printf("L%03d:\n", lblx);
-            op[0]->ex(function, blbl, clbl);
+            op[0]->ex(sList, function, blbl, clbl);
             printf("\tj0\tL%03d\n", lbly);
-            op[1]->ex(function, lbly, lblx);
+            op[1]->ex(sList, function, lbly, lblx);
             printf("\tjmp\tL%03d\n", lblx);
             printf("L%03d:\n", lbly);
             break;
         } case IF: {
-            op[0]->ex(function, blbl, clbl);
+            op[0]->ex(sList, function, blbl, clbl);
             if (op.size() > 2) {
                 /* if else */
                 printf("\tj0\tL%03d\n", lblx = lbl++);
-                op[1]->ex(function, blbl, clbl);
+                op[1]->ex(sList, function, blbl, clbl);
                 printf("\tjmp\tL%03d\n", lbly = lbl++);
                 printf("L%03d:\n", lblx);
-                op[2]->ex(function, blbl, clbl);
+                op[2]->ex(sList, function, blbl, clbl);
                 printf("L%03d:\n", lbly);
             } else {
                 /* if */
                 printf("\tj0\tL%03d\n", lblx = lbl++);
-                op[1]->ex(function, blbl, clbl);
+                op[1]->ex(sList, function, blbl, clbl);
                 printf("L%03d:\n", lblx);
             }
             break;
@@ -316,13 +317,13 @@ void StmtNode::ex(int function, int blbl, int clbl) const {
             if (op.size() == 0) {
                 printf("\tpush\t0\n");
             } else {
-                op[0]->ex(function, blbl, clbl);
+                op[0]->ex(sList, function, blbl, clbl);
             }
             printf("\tret\n");
             break;
         } default: {
             for (const auto & i : op) {
-                i->ex(function, blbl, clbl);
+                i->ex(sList, function, blbl, clbl);
             }
         }
     }
@@ -380,13 +381,13 @@ size_t FunctionNode::getNumParameters() const {
     return parameters.size();
 }
 
-void FunctionNode::ex(int function, int blbl, int clbl) const {
+void FunctionNode::ex(vector<int>& sList, int function, int blbl, int clbl) const {
     ;
 }
 
-void FunctionNode::exStmt(int function, int blbl, int clbl) const {
+void FunctionNode::exStmt(vector<int>& sList, int function, int blbl, int clbl) const {
     for (const auto & i : stmts) {
-        i->ex(function, blbl, clbl);
+        i->ex(sList, function, blbl, clbl);
     }
 }
 
@@ -406,7 +407,7 @@ void FunctionNode::check(vector<int>& sList, int base) const {
         exit(-1);
     }
     variableTable[i] = unordered_set<int>();
-    addressTable[i] = {0, unordered_map<int, int>()};
+    addressTable[i] = {0, unordered_map<int, unordered_map<int, int>>()};
     int size = 0;
     functionTable[i] = this;
     unordered_set<int> duplicateSet;
@@ -424,7 +425,7 @@ void FunctionNode::check(vector<int>& sList, int base) const {
         #if DEBUG
             cerr << "add variable " << j->getID() << " to " << i << endl;
         #endif
-        addressTable[i].second[(*j)->getID()] = - 3 + (size++) - parameters.size();
+        addressTable[i].second[][(*j)->getID()] = - 3 + (size++) - parameters.size();
     }
     #if DEBUG
         cerr << "adding function " << ID.i << " to " << GLOBAL << endl;
@@ -434,15 +435,15 @@ void FunctionNode::check(vector<int>& sList, int base) const {
 
 CallNode::CallNode(int i, const vector<shared_ptr<ExprNode> >& a):IDNode(i), arguments(a) {;}
 
-void CallNode::ex(int function, int blbl, int clbl) const {
+void CallNode::ex(vector<int>& sList, int function, int blbl, int clbl) const {
     if (i < 3) {
         cout << "\t" << reverseLookup[i] << "\n";
     } else if (i < 9) {
-        arguments.front()->ex(function, blbl, clbl);
+        arguments.front()->ex(sList, function, blbl, clbl);
         cout << "\t" << reverseLookup[i] << "\n";
     } else {
         for (const auto& i: arguments) {
-            i->ex(function, blbl, clbl);
+            i->ex(sList, function, blbl, clbl);
         }
         printf("\tcall\tL%03d, %d\n", functionLabel[i], (int)arguments.size());
     }
@@ -487,16 +488,16 @@ void CallNode::check(vector<int> & sList, int functionBase) const {
 
 VarNode::VarNode(int i, bool global, const vector<shared_ptr<ExprNode>>& s):IDNode(i), global(global), subscriptions(s) {;}
 
-void VarNode::push(int function) const {
+void VarNode::push(vector<int>& sList, int function) const {
     if (subscriptions.size() == 0) {
         if (global or function == GLOBAL) {
-            printf("\tpush\tsb[%d]\n", addressTable[GLOBAL].second[i]);
+            printf("\tpush\tsb[%d]\n", addressTable[GLOBAL].second[GLOBAL][i]);
         } else {
-            printf("\tpush\tfp[%d]\n", addressTable[function].second[i]);
+            printf("\tpush\tfp[%d]\n", addressTable[function].second[function][i]);
         }
         return;
     }
-    getOffSet(function, -1, -1);
+    getOffSet(sList, function, -1, -1);
     if (global or function == GLOBAL) {
         printf("\tpush\tsb[sb]\n");
     } else {
@@ -507,9 +508,9 @@ void VarNode::push(int function) const {
 void VarNode::pop(int function) const {
     if (subscriptions.size() == 0) {
         if (global or function == GLOBAL) {
-            printf("\tpop\tsb[%d]\n", addressTable[GLOBAL].second[i]);
+            printf("\tpop\tsb[%d]\n", addressTable[GLOBAL].second[GLOBAL][i]);
         } else {
-            printf("\tpop\tfp[%d]\n", addressTable[function].second[i]);
+            printf("\tpop\tfp[%d]\n", addressTable[function].second[][i]);
         }
         return;
     }
@@ -521,15 +522,15 @@ void VarNode::pop(int function) const {
     }
 }
 
-void VarNode::ex(int function, int blbl, int clbl) const {
+void VarNode::ex(vector<int>& sList, int function, int blbl, int clbl) const {
     push(function);
 }
-void VarNode::getOffSet(int function, int blbl, int clbl) const {
-    auto dimension = sizeMap[{function, i}];
+void VarNode::getOffSet(vector<int>& sList, int function, int blbl, int clbl) const {
+    auto dimension = sizeMap[{global?GLOBAL:function, i}];
     auto size = vector<int>();
     int accumulate = 1;
-    for (auto i = dimension.rbegin(); i != dimension.rend() - 1; ++i) {
-        accumulate *= *i;
+    for (auto j = dimension.size() -1 ; j != 0; --j) {
+        accumulate *= dimension[j];
         size.push_back(accumulate);
     }
     reverse(size.begin(), size.end());
@@ -551,20 +552,20 @@ void VarNode::getOffSet(int function, int blbl, int clbl) const {
         if (values[i] != -1) {
             printf("\tpush\t%d\n", size[i] * values[i]);
         } else {
-            subscriptions[i]->ex(function, blbl, clbl);
+            subscriptions[i]->ex(sList, function, blbl, clbl);
             printf("\tpush\t%d\n", size[i]);
             printf("\tmul\n");
         }
     }
     if (not subscriptions.back()->isKnown()) {
-        subscriptions.back()->ex(function, blbl, clbl);
+        subscriptions.back()->ex(sList, function, blbl, clbl);
     } else {
         printf("\tpush\t%d\n", subscriptions.back()->getValue());
     }
     for (int i = 0; i != subscriptions.size() - 1 ; ++i) {
         printf("\tadd\n");
     }
-    printf("\tpush\t%d\n", addressTable[function].second[i]);
+    printf("\tpush\t%d\n", addressTable[global?GLOBAL:function].second[getDefinitionScope(sList, functionBase)][i]);
     printf("\tadd\n");
     printf("\tpop\tsb\n");
 }
@@ -605,7 +606,7 @@ void VarNode::declare(vector<int> &sList, int functionBase) const {
             cerr << "Redeclaration of variable " << reverseLookup[i] << endl;
             exit(-1);
         }
-        addressTable[GLOBAL].second[i] = addressTable[GLOBAL].first;
+        addressTable[GLOBAL].second[GLOBAL][i] = addressTable[GLOBAL].first;
         addressTable[GLOBAL].first += size;
         variableTable[GLOBAL].insert(i);
         sizeMap[{GLOBAL, i}] = dimension;
@@ -619,7 +620,7 @@ void VarNode::declare(vector<int> &sList, int functionBase) const {
         #if DEBUG
             cerr << "add variable " << i << " to " << sList.back() << endl;
         #endif
-        addressTable[sList[functionBase]].second[i] = addressTable[sList[functionBase]].first;
+        addressTable[sList[functionBase]].second[sList.back()][i] = addressTable[sList[functionBase]].first;
         addressTable[sList[functionBase]].first += size;
         sizeMap[{sList.back(), i}] = dimension;
     }
@@ -645,7 +646,7 @@ void VarNode::assign(vector<int> & sList, int functionBase) const {
         }
         if (variableTable[GLOBAL].count(i) == 0) {
             variableTable[GLOBAL].insert(i);
-            addressTable[GLOBAL].second[i] = addressTable[GLOBAL].first++;
+            addressTable[GLOBAL].second[GLOBAL][i] = addressTable[GLOBAL].first++;
             sizeMap[{GLOBAL, i}] = vector<int>();
         }
     } else {
@@ -655,12 +656,12 @@ void VarNode::assign(vector<int> & sList, int functionBase) const {
             exit(-1);
         }
         if (s == -1) {
-            auto size = addressTable[sList[functionBase]].first++;
-            addressTable[sList[functionBase]].second[i] = addressTable[sList[functionBase]].first++;
+            addressTable[sList[functionBase]].second[sList.back()][i] = addressTable[sList[functionBase]].first++;
             variableTable[sList.back()].insert(i);
             #if DEBUG
                 cerr << "add variable " << i << " to " << sList.back() << endl;
             #endif
+            sizeMap[{sList.back(), i}] = vector<int>();
         }
     }
 }
@@ -698,9 +699,9 @@ void VarNode::check(vector<int>& sList, int functionBase) const {
 }
 
 DeclareNode::DeclareNode(const shared_ptr<VarNode>& v, const shared_ptr<ExprNode> e):variable(v), initializer(e) {;}
-void DeclareNode::ex(int function, int blbl, int clbl) const {
+void DeclareNode::ex(vector<int>& sList, int function, int blbl, int clbl) const {
     if (initializer != nullptr) {
-        initializer->ex(function, blbl, clbl);
+        initializer->ex(sList, function, blbl, clbl);
     }
 }
 
