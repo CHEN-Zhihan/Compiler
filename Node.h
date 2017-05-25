@@ -132,6 +132,7 @@ class VarNode : public IDNode {
     bool global;
     list<shared_ptr<Node>> subscriptions;
     int getDefinitionScope(const vector<int> &, int) const;
+    void getOffSet(int) const;
 };
 
 

@@ -87,7 +87,7 @@ void run(shared_ptr<Node> p) {
         printf("\tadd\n");
         printf("\tpop\tsp\n");
     }
-    p->ex(998, 998, GLOBAL);
+    p->ex(GLOBAL, 998, 998);
     printf("\tend\n");
     defineFunctions();
 }

@@ -23,6 +23,9 @@ using std::unordered_set;
 using std::dynamic_pointer_cast;
 using std::make_shared;
 
+#include <algorithm>
+using std::transform;
+
 #include <numeric>
 using std::accumulate;
 using std::multiplies;
@@ -68,7 +71,7 @@ void BoolNode::ex(int, int, int) const  {
 }
 void IntNode::ex(int, int, int) const { cout << "\tpush\t" << value << "\n"; }
 void incdec(shared_ptr<VarNode> v, int blbl, int clbl, int function, bool inc) {
-    v->ex(blbl, clbl, function);
+    v->ex(function, blbl, clbl);
     printf("\tpush\t1\n");
     if (inc) {
         printf("\tadd\n");
@@ -85,14 +88,14 @@ OprNode::OprNode(int oper, const vector<shared_ptr<Node>> &op)
 ExprNode::ExprNode(int oper, const vector<shared_ptr<Node>>& op):OprNode(oper, op) {;}
 bool ExprNode::isKnown() const {return known;}
 int ExprNode::getValue() const {return value;}
-void ExprNode::ex(int blbl, int clbl, int function) const {
+void ExprNode::ex(int function, int blbl=-1, int clbl=-1) const {
     if (known&&!inStatement) {
         printf("\t%d\n", value);
         return;
     }
     switch(oper) {
     case '=': {
-        op[1]->ex(blbl, clbl, function);
+        op[1]->ex(function, blbl, clbl);
         auto v = dynamic_pointer_cast<VarNode>(op[0]);
         v->pop(function);
         if (!inStatement) {
@@ -100,13 +103,13 @@ void ExprNode::ex(int blbl, int clbl, int function) const {
         }
         break;
     } case UMINUS: {
-        op[0]->ex(blbl, clbl, function);
+        op[0]->ex(function, blbl, clbl);
         printf("\tneg\n");
         break;
     }
     case POSINC: {
         if (!inStatement) {
-            op[0]->ex(blbl, clbl, function);
+            op[0]->ex(function, blbl, clbl);
         }
         incdec(dynamic_pointer_cast<VarNode>(op[0]), blbl, clbl, function,
                true);
@@ -115,13 +118,13 @@ void ExprNode::ex(int blbl, int clbl, int function) const {
         incdec(dynamic_pointer_cast<VarNode>(op[0]), blbl, clbl, function,
                true);
         if (!inStatement) {
-            op[0]->ex(blbl, clbl, function);
+            op[0]->ex(function, blbl, clbl);
         }
         break;
     }
     case POSDEC: {
         if (!inStatement) {
-            op[0]->ex(blbl, clbl, function);
+            op[0]->ex(function, blbl, clbl);
         }
         incdec(dynamic_pointer_cast<VarNode>(op[0]), blbl, clbl, function,
                false);
@@ -131,12 +134,12 @@ void ExprNode::ex(int blbl, int clbl, int function) const {
         incdec(dynamic_pointer_cast<VarNode>(op[0]), blbl, clbl, function,
                false);
         if (!inStatement) {
-            op[0]->ex(blbl, clbl, function);
+            op[0]->ex(function, blbl, clbl);
         }
         break;
     } default: {
         for (const auto &i : op) {
-            i->ex(blbl, clbl, function);
+            i->ex(function, blbl, clbl);
         }
         if (operatorInstruction.count(oper) != 0) {
             cout << "\t" << operatorInstruction[oper] << "\n";
@@ -225,7 +228,7 @@ void ValueNode::inStmt() {
     inStatement = true;
 }
 StmtNode::StmtNode(int oper, const vector<shared_ptr<Node>>&v):OprNode(oper, v){;}
-void StmtNode::ex(int blbl, int clbl, int function) const {
+void StmtNode::ex(int function, int blbl=-1, int clbl=-1) const {
     int lblx, lbly, lblz;
     switch (oper) {
     case BREAK: {
@@ -240,13 +243,13 @@ void StmtNode::ex(int blbl, int clbl, int function) const {
         lblx = lbl++;
         lbly = lbl++;
         lblz = lbl++;
-        op[0]->ex(blbl, clbl, function);
+        op[0]->ex(function, blbl, clbl);
         printf("L%03d:\n", lblx);
-        op[1]->ex(blbl, clbl, function);
+        op[1]->ex(function, blbl, clbl);
         printf("\tj0\tL%03d\n", lbly);
         op[3]->ex(lbly, lblz, function);
         printf("L%03d:\n", lblz);
-        op[2]->ex(blbl, clbl, function);
+        op[2]->ex(function, blbl, clbl);
         printf("\tjmp\tL%03d\n", lblx);
         printf("L%03d:\n", lbly);
         break;
@@ -255,7 +258,7 @@ void StmtNode::ex(int blbl, int clbl, int function) const {
         lblx = lbl++;
         lbly = lbl++;
         printf("L%03d:\n", lblx);
-        op[0]->ex(blbl, clbl, function);
+        op[0]->ex(function, blbl, clbl);
         printf("\tj0\tL%03d\n", lbly);
         op[1]->ex(lbly, lblx, function);
         printf("\tjmp\tL%03d\n", lblx);
@@ -263,19 +266,19 @@ void StmtNode::ex(int blbl, int clbl, int function) const {
         break;
     }
     case IF: {
-        op[0]->ex(blbl, clbl, function);
+        op[0]->ex(function, blbl, clbl);
         if (op.size() > 2) {
             /* if else */
             printf("\tj0\tL%03d\n", lblx = lbl++);
-            op[1]->ex(blbl, clbl, function);
+            op[1]->ex(function, blbl, clbl);
             printf("\tjmp\tL%03d\n", lbly = lbl++);
             printf("L%03d:\n", lblx);
-            op[2]->ex(blbl, clbl, function);
+            op[2]->ex(function, blbl, clbl);
             printf("L%03d:\n", lbly);
         } else {
             /* if */
             printf("\tj0\tL%03d\n", lblx = lbl++);
-            op[1]->ex(blbl, clbl, function);
+            op[1]->ex(function, blbl, clbl);
             printf("L%03d:\n", lblx);
         }
         break;
@@ -284,14 +287,14 @@ void StmtNode::ex(int blbl, int clbl, int function) const {
         if (op.size() == 0) {
             printf("\tpush\t0\n");
         } else {
-            op[0]->ex(blbl, clbl, function);
+            op[0]->ex(function, blbl, clbl);
         }
         printf("\tret\n");
         break;
     }
     default: {
         for (const auto & i : op) {
-            i->ex(blbl, clbl, function);
+            i->ex(function, blbl, clbl);
         }
     }
     }
@@ -354,11 +357,11 @@ FunctionNode::FunctionNode(VALUE_TYPE t, int i, const list<shared_ptr<VarNode>> 
 
 size_t FunctionNode::getNumParameters() const { return parameters.size(); }
 
-void FunctionNode::ex(int blbl, int clbl, int function) const { ; }
+void FunctionNode::ex(int function, int blbl=-1, int clbl=-1) const { ; }
 
 void FunctionNode::exStmt(int blbl, int clbl, int function) const {
     for (const auto & i : stmts) {
-        i->ex(blbl, clbl, function);
+        i->ex(function, blbl, clbl);
     }
 }
 
@@ -414,16 +417,16 @@ CallNode::CallNode(int i, const list<shared_ptr<Node>> a)
     ;
 }
 
-void CallNode::ex(int blbl, int clbl, int function) const {
+void CallNode::ex(int function, int blbl=-1, int clbl=-1) const {
     if (i < 3) {
         cout << "\t" << reverseLookup[i] << "\n";
         dynamic_cast<VarNode *>(arguments.front().get())->pop(function);
     } else if (i < 9) {
-        arguments.front()->ex(blbl, clbl, function);
+        arguments.front()->ex(function, blbl, clbl);
         cout << "\t" << reverseLookup[i] << "\n";
     } else {
         for (const auto &i : arguments) {
-            i->ex(blbl, clbl, function);
+            i->ex(function, blbl, clbl);
         }
         printf("\tcall\tL%03d, %d\n", functionLabel[i], (int)arguments.size());
     }
@@ -473,29 +476,121 @@ void VarNode::setType(VALUE_TYPE t) {
     type = t;
 }
 
+void VarNode::getOffSet(int function) const {
+    vector<int> dimension = typeTable[{function, i}].second;
+    auto size = list<int>();
+    int accumulate = 1;
+    
+    for (auto i = dimension.rbegin(); i != dimension.rend() - 1; ++i) {
+        accumulate *= *i;
+        size.push_front(accumulate);
+    }
+    auto j = subscriptions.begin();
+    bool known = true;
+    vector<pair<int, int>> values;
+    for (auto i = 0; i != size.size(); ++i) {
+        auto exprNode = dynamic_pointer_cast<ExprNode>(*j);
+        if (exprNode != nullptr and exprNode->isKnown()) {
+            values.push_back({i, exprNode->getValue()});
+        } else if (exprNode == nullptr and dynamic_pointer_cast<IntNode>(*j) == nullptr) {
+            known = false;
+        } else {
+            if (exprNode != nullptr) {
+
+            }
+        }
+    }
+    if (known) {
+
+    }
+    for (auto i = size.begin(); i != size.end(); ++i, ++j) {
+        auto exprNode = dynamic_pointer_cast<ExprNode>(*j);
+        if (exprNode != nullptr && exprNode->isKnown()) {
+            printf("\tpush\t%d\n", exprNode->getValue() * (*i));
+        } else if (exprNode == nullptr) {
+            auto intNode = dynamic_pointer_cast<IntNode>(*j);
+            printf("\tpush\t%d\n", intNode->getValue() * (*i));
+        } else {
+            (*j)->ex(function, -1, -1);
+            printf("\tpush\t%d\n", *i);
+            printf("\tmul\n");
+        }
+    }
+    subscriptions.back()->ex(function, -1, -1);
+    for (int i = 0; i != subscriptions.size() - 1; ++i) {
+        printf("\tadd\n");
+    }
+    if (subscriptions.size())
+    printf("\tpop\tsb\n");
+}
+
 void VarNode::push(int function) const {
-    if (global or function == GLOBAL) {
-        printf("\tpush\tsb[%d]\n", addressTable[GLOBAL].second[i]);
+    if (subscriptions.size() == 0) {
+        if (global or function == GLOBAL) {
+            printf("\tpush\tsb[%d]\n", addressTable[GLOBAL].second[i]);
+        } else {
+            printf("\tpush\tfp[%d]\n", addressTable[function].second[i]);
+        }
     } else {
-        printf("\tpush\tfp[%d]\n", addressTable[function].second[i]);
+        getOffSet(function);
+        if (global or function == GLOBAL) {
+            printf("\tpush\tsb[sp]\n");
+        } else {
+            printf("\tpush\tfp[sp]\n");
+        }
     }
 }
 
 void VarNode::pop(int function) const {
-    if (global or function == GLOBAL) {
-        printf("\tpop\tsb[%d]\n", addressTable[GLOBAL].second[i]);
+    if (subscriptions.size() == 0) {
+        if (global or function == GLOBAL) {
+            printf("\tpop\tsb[%d]\n", addressTable[GLOBAL].second[i]);
+        } else {
+            printf("\tpop\tfp[%d]\n", addressTable[function].second[i]);
+        }
     } else {
-        printf("\tpop\tfp[%d]\n", addressTable[function].second[i]);
+        getOffSet(function);
+        if (global or function == GLOBAL) {
+            printf("\tpop\tsb[sp]\n");
+        } else {
+            printf("\tpop\tfp[sp]\n");
+        }
     }
 }
 
-void VarNode::ex(int blbl, int clbl, int function) const { push(function); }
+void VarNode::ex(int function, int blbl=-1, int clbl=-1) const { push(function); }
 
 void VarNode::declare(vector<int> &sList, int functionBase) const {
     if (functionTable.count(i) != 0) {
         cerr << "Redefinition of function: " << reverseLookup[i] << endl;
         exit(-1);
-    } if (global) {
+    }
+    auto subValues = vector<int>(subscriptions.size());
+    transform(subscriptions.begin(), subscriptions.end(), subValues.begin(), [&sList, functionBase, this]
+        (shared_ptr<Node> node) -> int {
+            auto temp = dynamic_pointer_cast<ExprNode>(node);
+            int value = 0;
+            if (temp != nullptr) {
+                temp->evaluate(sList, functionBase);
+                value = temp->getValue();
+            } else {
+                auto intNode = dynamic_pointer_cast<IntNode>(node);
+                if (intNode != nullptr) {
+                    value = intNode->getValue();
+                } else {
+                    cerr << "invalid size of array " << reverseLookup[i] << endl;
+                    exit(-1);
+                }
+            }
+            if (value <= 0) {
+                cerr << "invalid size of array " << reverseLookup[i] << endl;
+                exit(-1);
+            }
+            return value;
+        }
+    );
+    int size = accumulate(subValues.begin(), subValues.end(), 1, multiplies<int>());
+    if (global) {
         if (sList[functionBase] == GLOBAL) {
             cerr << "Refer to global variable " << reverseLookup[i]
                  << " in the global scope" << endl;
@@ -506,37 +601,21 @@ void VarNode::declare(vector<int> &sList, int functionBase) const {
             exit(-1);
         }
         variableTable[GLOBAL].insert(i);
-        addressTable[GLOBAL].second[i] = addressTable[GLOBAL].first++;
+        addressTable[GLOBAL].second[i] = addressTable[GLOBAL].first;
+        addressTable[GLOBAL].first += size;
+        typeTable[{GLOBAL, i}] = {type, subValues};
+#if DEBUG
+        cerr << "add variable " << i << " to GLOBAL" << endl;
+#endif
     } else {
         if (variableTable[sList.back()].count(i) != 0) {
             cerr << "Redefinition of variable " << reverseLookup[i] << endl;
             exit(-1);
         }
         variableTable[sList.back()].insert(i);
-        int size = accumulate(subscriptions.begin(), subscriptions.end(), 1, [&sList, functionBase, this]
-            (int left, shared_ptr<Node> right) -> int {
-                auto temp = dynamic_pointer_cast<ExprNode>(right);
-                int value = 0;
-                if (temp != nullptr) {
-                    temp->evaluate(sList, functionBase);
-                    value = temp->getValue();
-                } else {
-                    auto intNode = dynamic_pointer_cast<IntNode>(right);
-                    if (intNode != nullptr) {
-                        value = intNode->getValue();
-                    } else {
-                        cerr << "invalid size of array " << reverseLookup[i] << endl;
-                        exit(-1);
-                    }
-                }
-                if (value <= 0) {
-                    cerr << "invalid size of array " << reverseLookup[i] << endl;
-                    exit(-1);
-                }
-                return left * value;
-        });
         addressTable[sList[functionBase]].second[i] = addressTable[sList[functionBase]].first;
         addressTable[sList[functionBase]].first += size;
+        typeTable[{sList[functionBase], i}] = {type, subValues};
 #if DEBUG
         cerr << "add variable " << i << " to " << sList.back() << endl;
 #endif
@@ -593,9 +672,9 @@ void DeclareNode::check(vector<int>& sList, int functionBase) const {
     variable->declare(sList, functionBase);
 }
 
-void DeclareNode::ex(int blbl, int clbl, int function) const  {
+void DeclareNode::ex(int function, int blbl=-1, int clbl=-1) const  {
     if (initializer != nullptr) {
-        initializer->ex(blbl, clbl, function);
+        initializer->ex(function, blbl, clbl);
         variable->pop(function);
     }
 }
@@ -608,7 +687,7 @@ void ParameterNode::check(vector<int>&, int) const {
     ;
 }
 
-void ParameterNode::ex(int blbl, int clbl, int function) const {
+void ParameterNode::ex(int function, int blbl=-1, int clbl=-1) const {
     ;
 }
 

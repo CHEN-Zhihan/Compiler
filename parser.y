@@ -137,7 +137,7 @@ nonEmptySubscriptions:
 
 subscriptionList:
         '[' expr ']'                        {$$ = buildList(shared_ptr<Node>($2));}
-        |  '[' expr ']' subscriptionList      {buildList($4, shared_ptr<Node>($2)); $$ = $4;}
+        |   subscriptionList '[' expr ']'     {buildList($1, shared_ptr<Node>($3)); $$ = $1;}
         ;
 stmt:
           ';'                                 { $$ = stmt(';', {}); }

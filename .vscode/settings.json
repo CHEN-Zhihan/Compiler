@@ -29,7 +29,8 @@
         "tuple": "cpp",
         "typeinfo": "cpp",
         "utility": "cpp",
-        "functional": "cpp"
+        "functional": "cpp",
+        "algorithm": "cpp"
     },
     "[cpp]": {
         "editor.quickSuggestions": false
