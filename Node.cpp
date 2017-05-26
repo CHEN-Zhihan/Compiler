@@ -186,12 +186,21 @@ void ExprNode::check(vector<int>& sList, int functionID) const {
         op[0]->check(sList, functionID);
     } else {
         op[1]->check(sList, functionID);
-
         dynamic_pointer_cast<VarNode>(op[0])->assign(sList, functionID);
         return;
     }
+    auto e = dynamic_pointer_cast<VarNode>(op[0]);
+    if (e != nullptr and e->getDimensions() != sizeMap[{e->getDefinitionScope(sList, functionID), e->getID()}].size()) {
+        cerr << "Invalid operation on array " << reverseLookup[e->getID()] << endl;
+        exit(-1);
+    }
     unordered_set<int> uniOp{INTEGER, STRING, CHARACTER, BOOL, VAR, UMINUS, CALL, POSINC, POSDEC, PREINC, PREDEC, CALL};
     if (uniOp.count(oper) == 0) {
+        auto e2 = dynamic_pointer_cast<VarNode>(op[1]);
+        if (e2 != nullptr and e2->getDimensions() != sizeMap[{e2->getDefinitionScope(sList, functionID), e2->getID()}].size()) {
+            cerr << "Invalid operation on array " << reverseLookup[e2->getID()] << endl;
+            exit(-1);
+        }
         op[1]->check(sList, functionID);
     }
     if (oper == POSINC or oper == POSDEC or oper == PREINC or oper == PREDEC) {
@@ -687,6 +696,10 @@ void VarNode::declare(vector<int> &sList, int functionID) const {
     }
 }
 
+int VarNode::getDimensions() const {
+    return subscriptions.size();
+}
+
 void VarNode::assign(vector<int> & sList, int functionID) const {
     if (functionTable.count(i) != 0) {
         cerr << "Redefinition of function: " << reverseLookup[i] << endl;
@@ -781,7 +794,7 @@ void DeclareNode::ex(vector<int>& sList, int function, int blbl, int clbl) const
     if (initializer != nullptr) {
         auto dimension = sizeMap[{sList.back(), variable->getID()}];
         int address = addressTable[function].second[variable->getDefinitionScope(sList, function)][variable->getID()];        
-        int size = accumulate(dimension.begin(), dimension.end(), 0);
+        int size = accumulate(dimension.begin(), dimension.end(), 1, multiplies<int>());
         string base =(variable->isGlobal() or function == GLOBAL) ? "sb" : "fp";
         for (int i = 0; i != size; ++i) {
             initializer->ex(sList, function, blbl, clbl);

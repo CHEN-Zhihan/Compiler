@@ -75,7 +75,6 @@ void run(shared_ptr<Node> p) {
             cerr << i << reverseLookup[i] << endl;
         }
     #endif
-    ++addressTable[GLOBAL].first; // used as a register for offset calculation.        
     p->check(sList, GLOBAL);
     if (addressTable[GLOBAL].first != 0) {
         printf("\tpush\tsp\n");

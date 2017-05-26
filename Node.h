@@ -113,7 +113,8 @@ public:
     void push(vector<int>&, int) const;
     void declare(vector<int>&, int) const;
     bool isGlobal() const;
-    int getDefinitionScope(const vector<int>&, int) const;    
+    int getDefinitionScope(const vector<int>&, int) const;
+    int getDimensions() const;
 private:
     bool global;
     vector<shared_ptr<ExprNode> > subscriptions;
