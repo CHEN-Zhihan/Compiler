@@ -1,11 +1,15 @@
-def fact(n) {
-  if(n<1) return 1;
-  return n * fact(n-1);
+array x[5][10];
+x[2][10] = geti();
+puti(x[2][3+7]);
+
+def f2(x[]) {
+    array b[3];
+    puti(x[1]);
 }
-puts_("Please enter a +ve int <= 12: ");
-n = geti();
-if (n <= 12) {
-	puti(fact(n));
-} else {
-	puti_(n); puts(" > 12!!");
+
+def f1() {
+    array x[2];
+    f2(x);
 }
+
+f1();

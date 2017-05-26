@@ -64,6 +64,7 @@ map<pair<int, int>, vector<int>> sizeMap;
 extern unordered_map<int, const FunctionNode* > functionTable;
 extern unordered_map<int, unordered_set<int> > variableTable;
 extern vector<string> reverseLookup;
+#define DEBUG false
 
 int findSpace(int targetSize) {
     for (const auto & i : reusableAddress) {
@@ -487,13 +488,13 @@ void FunctionNode::check(vector<int>& sList, int base) const {
         duplicateSet.insert((*j)->getID());
         variableTable[i].insert((*j)->getID());
         #if DEBUG
-            cerr << "add variable " << j->getID() << " to " << i << endl;
+            cerr << "add variable " << reverseLookup[(*j)->getID()] << " to " << i << endl;
         #endif
         addressTable.second[i][(*j)->getID()] = - 3 + (size++) - parameters.size();
         sizeMap[{i, (*j)->getID()}] = vector<int>((*j)->getDimensions());
     }
     #if DEBUG
-        cerr << "adding function " << ID.i << " to " << GLOBAL << endl;
+        cerr << "adding function " << reverseLookup[this->i] << " to " << GLOBAL << endl;
     #endif
     variableTable[GLOBAL].insert(i);
 }
@@ -502,10 +503,18 @@ void FunctionNode::match(const vector<shared_ptr<ExprNode> >& arguments, const v
     for (int i = 0; i != arguments.size(); ++i) {
         auto parameter = parameters[i];
         auto argument = arguments[i];
-        auto dimension = sizeMap[{parameter->getDefinitionScope(sList, base), parameter->getID()}];
         if (parameter->getDimensions() != 0) {
             auto v = dynamic_pointer_cast<VarNode>(argument->op[0]);
-            if (argument->oper != VAR or v->getDimensions() != dimension.size()) {
+            auto dimension = sizeMap[{parameter->getDefinitionScope(sList, base), v->getID()}];            
+            if (argument->oper != VAR or parameter->getDimensions() != dimension.size()) {
+                #if DEBUG
+                    if (argument->oper == VAR) {
+                        cerr << "v->getDimensions(): " << parameter->getDimensions() <<
+                        " dimension.size(): " << dimension.size() << " for function " << reverseLookup[this->i] << endl;
+                    } else {
+                        cerr << i  << " th not variable for function " << reverseLookup[this->i] << endl; 
+                    }
+                #endif
                 cerr << "Invalid " << i << " th argument for function " << reverseLookup[this->i] << endl;
                 exit(-1);
             }

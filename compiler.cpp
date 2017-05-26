@@ -30,7 +30,6 @@ using ID = int;
 
 extern int GLOBAL;
 
-#define DEBUG false
 
 extern vector<string> reverseLookup;/* maps a variable identifier to a name*/
 unordered_map<int,  const FunctionNode* >functionTable; /* maps a function ID to the node it corresponds to*/
