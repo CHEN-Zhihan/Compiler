@@ -61,16 +61,22 @@ extern unordered_map<int, int> functionLabel;
 extern pair<int, map<scope, unordered_map<ID, address> > > addressTable;
 set<pair<int, int> > reusableAddress;
 map<pair<int, int>, vector<int>> sizeMap;
-extern unordered_map<int, const FunctionNode* > functionTable;
+extern unordered_map<int, FunctionNode* > functionTable;
 extern unordered_map<int, unordered_set<int> > variableTable;
 extern vector<string> reverseLookup;
 
 int findSpace(int targetSize) {
     for (const auto & i : reusableAddress) {
         if (i.second == targetSize) {
+            #if DEBUG
+                cerr << "found a space at " << i.first << " of size " << targetSize << endl;
+            #endif
             reusableAddress.erase(i);
             return i.first;
         } else if (i.second > targetSize) {
+            #if DEBUG
+                cerr << "found a space at " << i.first << " of size " << i.second << " " << i.second - targetSize << " left" << endl;
+            #endif
             reusableAddress.erase(i);
             reusableAddress.insert({i.first + targetSize, i.second - targetSize});
             return i.first;
@@ -85,10 +91,13 @@ void releaseSpace(int scopeID) {
         auto size = accumulate(dimension.begin(), dimension.end(), 1, multiplies<int>());
         auto p = pair<int, int>{i.second, size};
         reusableAddress.insert(p);
+        #if DEBUG
+            cerr << "Returning space at " << i.second << " of size " << size << endl; 
+        #endif
     }
 }
 
-void ConNode::check(vector<int>&, int) const {;}
+void ConNode::check(vector<int>&, int) {;}
 
 StrNode::StrNode(const string& v):value(v) {;}
 void StrNode::ex(vector<int>& sList, int, int, int) const {
@@ -148,6 +157,12 @@ void ExprNode::ex(vector<int>& sList, int functionID, int blbl, int clbl) const 
                 v->push(sList, functionID);
             }
             break;
+        } case NOT: {
+            printf("\tpush\t1\n");
+            op[0]->ex(sList, functionID, blbl, clbl);
+            printf("\tsub\n");
+            break;
+
         } case UMINUS: {
             op[0]->ex(sList, functionID, blbl, clbl);
             printf("\tneg\n");
@@ -201,7 +216,7 @@ void ExprNode::checkArray(vector<int>& sList, int functionID, const shared_ptr<N
 }
 
 
-void ExprNode::check(vector<int>& sList, int functionID) const {
+void ExprNode::check(vector<int>& sList, int functionID) {
     if (oper != '=') {
         op[0]->check(sList, functionID);
     } else {
@@ -210,7 +225,7 @@ void ExprNode::check(vector<int>& sList, int functionID) const {
         return;
     }
     checkArray(sList, functionID, op[0]);
-    unordered_set<int> uniOp{INTEGER, STRING, CHARACTER, BOOL, VAR, UMINUS, CALL, POSINC, POSDEC, PREINC, PREDEC, CALL};
+    unordered_set<int> uniOp{NOT, INTEGER, STRING, CHARACTER, BOOL, VAR, UMINUS, CALL, POSINC, POSDEC, PREINC, PREDEC, CALL};
     if (uniOp.count(oper) == 0) {
         checkArray(sList, functionID, op[1]);
         op[1]->check(sList, functionID);
@@ -389,7 +404,7 @@ void StmtNode::ex(vector<int>& sList, int functionID, int blbl, int clbl) const 
         }
     }
 }
-void StmtNode::check(vector<int>& sList, int functionID) const {
+void StmtNode::check(vector<int>& sList, int functionID) {
     switch (oper) {
         case RETURN: {
             if (functionID == GLOBAL) {
@@ -450,18 +465,20 @@ void FunctionNode::ex(vector<int>& sList, int functionID, int blbl, int clbl) co
 }
 
 void FunctionNode::exStmt(vector<int>& sList, int functionID, int blbl, int clbl) const {
+    scopeCounter = baseScope;
     for (const auto & i : stmts) {
         i->ex(sList, functionID, blbl, clbl);
     }
 }
 
-void FunctionNode::checkStmt(vector<int>& sList, int base) const {
+void FunctionNode::checkStmt(vector<int>& sList, int base) {
+    baseScope = scopeCounter;
     for (const auto & i : stmts) {
         i->check(sList, base);
     }
 }
 
-void FunctionNode::check(vector<int>& sList, int base) const {
+void FunctionNode::check(vector<int>& sList, int base) {
     if (sList.back() != GLOBAL) {
         cerr << "Function " << reverseLookup[i] << " can only be defined in the global scope" << endl;
         exit(-1);
@@ -539,7 +556,7 @@ void CallNode::ex(vector<int>& sList, int function, int blbl, int clbl) const {
     }
 }
 
-void CallNode::check(vector<int> & sList, int functionID) const {
+void CallNode::check(vector<int> & sList, int functionID) {
     if (i < 9) {
         if (arguments.size() != 1 and i >= 3) {
             cerr << reverseLookup[i] << " expects 1 argument, got " << arguments.size() << endl;
@@ -817,7 +834,7 @@ int VarNode::getDefinitionScope(const vector<int>& sList, int functionID) const 
 
 bool  VarNode::isGlobal() const {return global;}
 
-void VarNode::check(vector<int>& sList, int functionID) const {
+void VarNode::check(vector<int>& sList, int functionID) {
     if (global) {
         if (variableTable[GLOBAL].count(i) == 0) {
             cerr << "Undefined reference to global variable: " << reverseLookup[i] << endl;
@@ -854,7 +871,7 @@ void DeclareNode::ex(vector<int>& sList, int function, int blbl, int clbl) const
     }
 }
 
-void DeclareNode::check(vector<int>& sList, int functionID) const {
+void DeclareNode::check(vector<int>& sList, int functionID) {
     if (initializer != nullptr) {
         initializer->check(sList, functionID);
     }

@@ -87,6 +87,7 @@ void yyerror(char *);
 "!="        return NE;
 "&&"        return AND;
 "||"        return OR;
+"!"         return NOT;
 \/\/.*\n    ;    /* skip comments */
 [ \t\n]+    ;       /* ignore whitespace */
 "array "    return ARRAY;

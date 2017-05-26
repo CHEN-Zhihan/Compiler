@@ -8,6 +8,9 @@ run: c6 test.sc cvm
 	./c6 test.sc > test.as
 	./cvm test.as
 
+play: c6 tic-tac-toe.sc cvm
+	./c6 tic-tac-toe.sc > tic-tac-toe.as
+	./cvm tic-tac-toe.as
 
 scanner.cpp: scanner.l
 	flex  -o scanner.cpp scanner.l

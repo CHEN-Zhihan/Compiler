@@ -1,35 +1,52 @@
 	push	sp
-	push	56
+	push	2
 	add
 	pop	sp
-	push	0
-	pop	sb[50]
-	push	1
-	push	2
-	push	51
-	add
-	pop	ac
-	pop	sb[ac]
-	push	51
-	call	L000, 1
+	call	L000, 0
+	call	L001, 0
 	end
 L001:
-	push	2
-	push	fp[-4]
-	add
-	pop	ac
-	push	sb[ac]
-	puti
-	push	3
-	push	2
-	push	fp[-4]
-	add
-	pop	ac
-	pop	sb[ac]
+L002:
+	push	1
+	j0	L003
+	push	1
+	j0	L004
+	jmp	L003
+L004:
+	jmp	L002
+L003:
 	push	0
 	ret
 L000:
-	push	fp[-4]
-	call	L001, 1
+	push	0
+	pop	sb[0]
+L005:
+	push	sb[0]
+	push	3
+	compNE
+	j0	L006
+	push	0
+	pop	sb[1]
+L008:
+	push	sb[1]
+	push	3
+	compNE
+	j0	L009
+	push	1
+	puti
+L010:
+	push	sb[1]
+	push	1
+	add
+	pop	sb[1]
+	jmp	L008
+L009:
+L007:
+	push	sb[0]
+	push	1
+	add
+	pop	sb[0]
+	jmp	L005
+L006:
 	push	0
 	ret

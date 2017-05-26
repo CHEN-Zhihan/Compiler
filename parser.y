@@ -81,7 +81,7 @@ const int VAR = -5;
 %left '+' '-' 
 %left '*' '/' '%'
 %right INC DEC
-%nonassoc UMINUS
+%nonassoc UMINUS NOT
 
 %type <nPtr> stmt variable
 
@@ -194,6 +194,7 @@ expr:
         | expr EQ expr          { $$ = expr(EQ, {$1, $3});}
         | expr AND expr            { $$ = expr(AND, {$1, $3});}
         | expr OR expr            { $$ = expr(OR, {$1, $3});}
+        | NOT expr            {$$ = expr(NOT, {$2});}
         | '(' expr ')'          { $$ = $2;}
         | VARIABLE '(' argList ')' {$$ = expr(CALL, {call($1, $3)});}
         ;
