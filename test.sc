@@ -1,18 +1,15 @@
-def print() {
+def canWin() {
+    if (true) {
+        ;
+    }
+}
+def minimax(isComputer) {
+    canWin();
     for (i = 0; i != 3; ++i;) {
         for (j = 0; j != 3; ++j;) {
-            puti(1);
+                puts("I am computer, putting at ");
         }
     }
 }
 
-def set() {
-    while (true) {
-        if (true) {
-            break;
-        }
-    }
-}
-
-print();
-set();
+minimax(true);

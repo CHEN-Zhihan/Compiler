@@ -40,7 +40,8 @@ using address = int;
 using ID = int;
 
 #define ADDSCOPE(node)\
-    sList.push_back(--scopeCounter);\
+    scope = --scopeCounter;\
+    sList.push_back(scope);\
     variableTable[scopeCounter] = unordered_set<int>();\
     addressTable.second[scopeCounter] = unordered_map<int, int>();\
     node->check(sList, functionID);\
@@ -342,7 +343,7 @@ void StmtNode::ex(vector<int>& sList, int functionID, int blbl, int clbl) const 
             lblx = lbl++;
             lbly = lbl++;
             lblz = lbl++;
-            sList.push_back(--scopeCounter);
+            sList.push_back(scope);
             op[0]->ex(sList, functionID, blbl, clbl);
             printf("L%03d:\n", lblx);
             op[1]->ex(sList, functionID, blbl, clbl);
@@ -360,7 +361,7 @@ void StmtNode::ex(vector<int>& sList, int functionID, int blbl, int clbl) const 
             printf("L%03d:\n", lblx);
             op[0]->ex(sList, functionID, blbl, clbl);
             printf("\tj0\tL%03d\n", lbly);
-            sList.push_back(--scopeCounter);
+            sList.push_back(scope);
             op[1]->ex(sList, functionID, lbly, lblx);
             sList.pop_back();
             printf("\tjmp\tL%03d\n", lblx);
@@ -371,19 +372,19 @@ void StmtNode::ex(vector<int>& sList, int functionID, int blbl, int clbl) const 
             if (op.size() > 2) {
                 /* if else */
                 printf("\tj0\tL%03d\n", lblx = lbl++);
-                sList.push_back(--scopeCounter);
+                sList.push_back(scope);
                 op[1]->ex(sList, functionID, blbl, clbl);
                 sList.pop_back();
                 printf("\tjmp\tL%03d\n", lbly = lbl++);
                 printf("L%03d:\n", lblx);
-                sList.push_back(--scopeCounter);
+                sList.push_back(scope);
                 op[2]->ex(sList, functionID, blbl, clbl);
                 sList.pop_back();
                 printf("L%03d:\n", lbly);
             } else {
                 /* if */
                 printf("\tj0\tL%03d\n", lblx = lbl++);
-                sList.push_back(--scopeCounter);
+                sList.push_back(scope);
                 op[1]->ex(sList, functionID, blbl, clbl);
                 sList.pop_back();
                 printf("L%03d:\n", lblx);
@@ -416,7 +417,8 @@ void StmtNode::check(vector<int>& sList, int functionID) {
             }
             break;
         } case FOR: {
-            sList.push_back(--scopeCounter);
+            scope = --scopeCounter;
+            sList.push_back(scope);
             variableTable[scopeCounter] = unordered_set<int>();
             addressTable.second[scopeCounter] = unordered_map<int, int>();
             op[0]->check(sList, functionID);
@@ -465,14 +467,13 @@ void FunctionNode::ex(vector<int>& sList, int functionID, int blbl, int clbl) co
 }
 
 void FunctionNode::exStmt(vector<int>& sList, int functionID, int blbl, int clbl) const {
-    scopeCounter = baseScope;
     for (const auto & i : stmts) {
         i->ex(sList, functionID, blbl, clbl);
     }
 }
 
 void FunctionNode::checkStmt(vector<int>& sList, int base) {
-    baseScope = scopeCounter;
+    scope = sList.back();
     for (const auto & i : stmts) {
         i->check(sList, base);
     }

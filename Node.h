@@ -98,6 +98,7 @@ public:
     void check(vector<int>&, int);
 private:
     int oper;
+    int scope;
     vector<shared_ptr<Node>> op;
 };
 
@@ -155,7 +156,7 @@ public:
 private:
     vector<shared_ptr<VarNode> > parameters;
     vector<shared_ptr<Node> > stmts;
-    int baseScope;
+    int scope;
 };
 
 class CallNode: public IDNode {
