@@ -109,14 +109,15 @@ public:
     void ex(vector<int>&, int, int, int) const;
     void check(vector<int>&, int) const;
     void assign(vector<int>&, int) const;
-    void pop(int) const;
-    void push(int) const;
+    void pop(vector<int>&, int) const;
+    void push(vector<int>&, int) const;
     void declare(vector<int>&, int) const;
 private:
     bool global;
     vector<shared_ptr<ExprNode> > subscriptions;
     int getDefinitionScope(const vector<int>&, int) const;
-    void getOffSet(int, int, int) const;
+    void getOffSet(vector<int>&, int, int, int) const;
+    void pushPop(vector<int>&, int, bool) const;
     vector<int> getDimension() const;
 };
 
