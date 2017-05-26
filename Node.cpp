@@ -372,7 +372,7 @@ void StmtNode::ex(vector<int>& sList, int functionID, int blbl, int clbl) const 
             if (op.size() > 2) {
                 /* if else */
                 printf("\tj0\tL%03d\n", lblx = lbl++);
-                sList.push_back(scope);
+                sList.push_back(scope + 1); // if has 2 scopes;
                 op[1]->ex(sList, functionID, blbl, clbl);
                 sList.pop_back();
                 printf("\tjmp\tL%03d\n", lbly = lbl++);

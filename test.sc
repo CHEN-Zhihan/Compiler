@@ -1,14 +1,14 @@
-def canWin() {
-    if (true) {
-        ;
-    }
-}
+EMPTY = 0;
+PLAYER = 1;
+COMPUTER = 2;
+array board[3][3] = EMPTY;
 def minimax(isComputer) {
-    canWin();
-    for (i = 0; i != 3; ++i;) {
-        for (j = 0; j != 3; ++j;) {
-                puts("I am computer, putting at ");
-        }
+    if (isComputer) {
+        max = -2;
+        return max;
+    } else {
+        min = 2;
+        return min;
     }
 }
 
