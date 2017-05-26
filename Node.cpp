@@ -22,11 +22,12 @@ using std::array;
 
 #include <algorithm>
 using std::transform;
-using std::accumulate;
 using std::reverse;
 
 #include <numeric>
 using std::multiplies;
+using std::accumulate;
+
 
 #include "Node.h"
 #include "parser.tab.h"
@@ -185,6 +186,7 @@ void ExprNode::check(vector<int>& sList, int functionID) const {
         op[0]->check(sList, functionID);
     } else {
         op[1]->check(sList, functionID);
+
         dynamic_pointer_cast<VarNode>(op[0])->assign(sList, functionID);
         return;
     }
@@ -544,9 +546,9 @@ void VarNode::pushPop(vector<int>&sList, int functionID, bool push) const {
     }
     getOffSet(sList, functionID, -1, -1);
     if (global or functionID == GLOBAL) {
-        cout << "\t" << instruction << "\tsb[sb]\n";
+        cout << "\t" << instruction << "\tsb[ac]\n";
     } else {
-        cout << "\t" << instruction << "\tfp[sb]\n";
+        cout << "\t" << instruction << "\tfp[ac]\n";
     }
 }
 
@@ -564,14 +566,14 @@ void VarNode::ex(vector<int>& sList, int function, int blbl, int clbl) const {
 void VarNode::getOffSet(vector<int>& sList, int functionID, int blbl, int clbl) const {
     auto dimension = sizeMap[{global?GLOBAL:functionID, i}];
     auto size = vector<int>();
-    int accumulate = 1;
+    int acc = 1;
     for (auto j = dimension.size() -1 ; j != 0; --j) {
-        accumulate *= dimension[j];
-        size.push_back(accumulate);
+        acc *= dimension[j];
+        size.push_back(acc);
     }
     reverse(size.begin(), size.end());
     vector<int> values;
-    vector<int> unknowns;
+    bool known = true;
     for (int j = 0; j != subscriptions.size();++j) {
         if (subscriptions[j]->isKnown()) {
             auto value = subscriptions[j]->getValue();
@@ -582,7 +584,20 @@ void VarNode::getOffSet(vector<int>& sList, int functionID, int blbl, int clbl) 
             values.push_back(value);
         } else {
             values.push_back(-1);
+            known = false;
         }
+    }
+    vector<int> offsets;
+    if (known) {
+        for (int i = 0; i != values.size() - 1; ++i) {
+            offsets.push_back(size[i] * values[i]);
+        }
+        offsets.push_back(values.back());
+        offsets.push_back(addressTable[global?GLOBAL:functionID].second[getDefinitionScope(sList, functionID)][i]);
+        int sum = accumulate(offsets.begin(), offsets.end(), 0);
+        printf("\tpush\t%d\n", sum);
+        printf("\tpop\tac\n");
+        return;
     }
     for (int i = 0; i != values.size() - 1; ++i) {
         if (values[i] != -1) {
@@ -603,7 +618,7 @@ void VarNode::getOffSet(vector<int>& sList, int functionID, int blbl, int clbl) 
     }
     printf("\tpush\t%d\n", addressTable[global?GLOBAL:functionID].second[getDefinitionScope(sList, functionID)][i]);
     printf("\tadd\n");
-    printf("\tpop\tsb\n");
+    printf("\tpop\tac\n");
 }
 
 vector<int> VarNode::getDimension() const {
@@ -736,6 +751,8 @@ int VarNode::getDefinitionScope(const vector<int>& sList, int functionID) const 
     }
 }
 
+bool  VarNode::isGlobal() const {return global;}
+
 void VarNode::check(vector<int>& sList, int functionID) const {
     if (global) {
         if (variableTable[GLOBAL].count(i) == 0) {
@@ -762,7 +779,14 @@ void VarNode::check(vector<int>& sList, int functionID) const {
 DeclareNode::DeclareNode(const shared_ptr<VarNode>& v, const shared_ptr<ExprNode> e):variable(v), initializer(e) {;}
 void DeclareNode::ex(vector<int>& sList, int function, int blbl, int clbl) const {
     if (initializer != nullptr) {
-        initializer->ex(sList, function, blbl, clbl);
+        auto dimension = sizeMap[{sList.back(), variable->getID()}];
+        int address = addressTable[function].second[variable->getDefinitionScope(sList, function)][variable->getID()];        
+        int size = accumulate(dimension.begin(), dimension.end(), 0);
+        string base =(variable->isGlobal() or function == GLOBAL) ? "sb" : "fp";
+        for (int i = 0; i != size; ++i) {
+            initializer->ex(sList, function, blbl, clbl);
+            cout << "\tpop\t" << base << "[" << address + i << "]\n";
+        }
     }
 }
 

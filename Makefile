@@ -21,7 +21,7 @@ clean:
 cvm: nas/nas.l nas/nas.y
 	flex  -o nas.yy.c nas/nas.l
 	bison nas/nas.y -d
-	g++ nas.yy.c nas.tab.c -o cvm -std=c++11
+	g++ nas.yy.c nas.tab.c -o cvm -std=c++11 -g
 	rm nas.tab.c nas.tab.h nas.yy.c
 
 .PHONY:

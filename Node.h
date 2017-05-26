@@ -112,10 +112,11 @@ public:
     void pop(vector<int>&, int) const;
     void push(vector<int>&, int) const;
     void declare(vector<int>&, int) const;
+    bool isGlobal() const;
+    int getDefinitionScope(const vector<int>&, int) const;    
 private:
     bool global;
     vector<shared_ptr<ExprNode> > subscriptions;
-    int getDefinitionScope(const vector<int>&, int) const;
     void getOffSet(vector<int>&, int, int, int) const;
     void pushPop(vector<int>&, int, bool) const;
     vector<int> getDimension() const;
