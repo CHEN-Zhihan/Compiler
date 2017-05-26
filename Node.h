@@ -98,7 +98,7 @@ public:
     void check(vector<int>&, int);
 private:
     int oper;
-    int scope;
+    vector<int> scopes;
     vector<shared_ptr<Node>> op;
 };
 

@@ -413,7 +413,7 @@ L037:
 	j0	L038
 	push	2
 	neg
-	pop	sb[0]
+	pop	sb[13]
 	push	0
 	pop	sb[14]
 L039:
@@ -472,11 +472,11 @@ L042:
 	pop	ac
 	pop	sb[ac]
 	push	sb[12]
-	push	sb[0]
+	push	sb[13]
 	compGT
 	j0	L046
 	push	sb[12]
-	pop	sb[0]
+	pop	sb[13]
 L046:
 L045:
 L044:
@@ -493,7 +493,7 @@ L041:
 	pop	sb[14]
 	jmp	L039
 L040:
-	push	sb[0]
+	push	sb[13]
 	ret
 	jmp	L047
 L038:
