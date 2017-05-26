@@ -15,6 +15,9 @@ using std::list;
 
 #include <array>
 using std::array;
+
+#define DEBUG false
+
 class FunctionNode;
 class CallNode;
 class Node {

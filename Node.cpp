@@ -64,7 +64,6 @@ map<pair<int, int>, vector<int>> sizeMap;
 extern unordered_map<int, const FunctionNode* > functionTable;
 extern unordered_map<int, unordered_set<int> > variableTable;
 extern vector<string> reverseLookup;
-#define DEBUG false
 
 int findSpace(int targetSize) {
     for (const auto & i : reusableAddress) {
@@ -489,6 +488,7 @@ void FunctionNode::check(vector<int>& sList, int base) const {
         variableTable[i].insert((*j)->getID());
         #if DEBUG
             cerr << "add variable " << reverseLookup[(*j)->getID()] << " to " << i << endl;
+            cerr << "add variable of size " << (*j)->getDimensions() << " to " << i << " " << (*j)->getID() << endl;
         #endif
         addressTable.second[i][(*j)->getID()] = - 3 + (size++) - parameters.size();
         sizeMap[{i, (*j)->getID()}] = vector<int>((*j)->getDimensions());
@@ -504,16 +504,16 @@ void FunctionNode::match(const vector<shared_ptr<ExprNode> >& arguments, const v
         auto parameter = parameters[i];
         auto argument = arguments[i];
         if (parameter->getDimensions() != 0) {
+            if (argument->oper != VAR) {
+                cerr << "Invalid " << i << " th argument for function " << reverseLookup[this->i] << endl;
+                exit(-1);
+            }
             auto v = dynamic_pointer_cast<VarNode>(argument->op[0]);
-            auto dimension = sizeMap[{parameter->getDefinitionScope(sList, base), v->getID()}];            
-            if (argument->oper != VAR or parameter->getDimensions() != dimension.size()) {
+            auto dimension = sizeMap[{v->getDefinitionScope(sList, base), v->getID()}];
+            if (parameter->getDimensions() != dimension.size()) {
                 #if DEBUG
-                    if (argument->oper == VAR) {
-                        cerr << "v->getDimensions(): " << parameter->getDimensions() <<
-                        " dimension.size(): " << dimension.size() << " for function " << reverseLookup[this->i] << endl;
-                    } else {
-                        cerr << i  << " th not variable for function " << reverseLookup[this->i] << endl; 
-                    }
+                    cerr << "expect " << parameter->getDimensions() <<
+                    " got " << dimension.size() << " for function " << reverseLookup[this->i] << endl;
                 #endif
                 cerr << "Invalid " << i << " th argument for function " << reverseLookup[this->i] << endl;
                 exit(-1);
@@ -602,8 +602,18 @@ void VarNode::pop(vector<int>&sList, int functionID) const {
     pushPop(sList, functionID, false);
 }
 
-void VarNode::ex(vector<int>& sList, int function, int blbl, int clbl) const {
-    push(sList, function);
+void VarNode::ex(vector<int>& sList, int functionID, int blbl, int clbl) const {
+    int definitionScope = getDefinitionScope(sList, functionID);
+    if (sizeMap[{definitionScope, i}].size() != 0 and subscriptions.size() == 0) {
+        int address = addressTable.second[definitionScope][i];
+        if (address < 0) { // is parameter
+            printf("\tpush\tfp[%d]\n", address);
+        } else {
+            printf("\tpush\t%d\n", addressTable.second[definitionScope][i]);
+        }
+    } else {
+        push(sList, functionID);
+    }
 }
 void VarNode::getOffSet(vector<int>& sList, int functionID, int blbl, int clbl) const {
     auto dimension = sizeMap[{global?GLOBAL:functionID, i}];
@@ -635,30 +645,33 @@ void VarNode::getOffSet(vector<int>& sList, int functionID, int blbl, int clbl) 
             offsets.push_back(size[i] * values[i]);
         }
         offsets.push_back(values.back());
-        offsets.push_back(addressTable.second[getDefinitionScope(sList, functionID)][i]);
         int sum = accumulate(offsets.begin(), offsets.end(), 0);
         printf("\tpush\t%d\n", sum);
-        printf("\tpop\tac\n");
-        return;
-    }
-    for (int i = 0; i != values.size() - 1; ++i) {
-        if (values[i] != -1) {
-            printf("\tpush\t%d\n", size[i] * values[i]);
+    } else {
+        for (int i = 0; i != values.size() - 1; ++i) {
+            if (values[i] != -1) {
+                printf("\tpush\t%d\n", size[i] * values[i]);
+            } else {
+                subscriptions[i]->ex(sList, functionID, blbl, clbl);
+                printf("\tpush\t%d\n", size[i]);
+                printf("\tmul\n");
+            }
+        }
+        if (not subscriptions.back()->isKnown()) {
+            subscriptions.back()->ex(sList, functionID, blbl, clbl);
         } else {
-            subscriptions[i]->ex(sList, functionID, blbl, clbl);
-            printf("\tpush\t%d\n", size[i]);
-            printf("\tmul\n");
+            printf("\tpush\t%d\n", subscriptions.back()->getValue());
+        }
+        for (int i = 0; i != subscriptions.size() - 1; ++i) {
+            printf("\tadd\n");
         }
     }
-    if (not subscriptions.back()->isKnown()) {
-        subscriptions.back()->ex(sList, functionID, blbl, clbl);
+    auto address = addressTable.second[getDefinitionScope(sList, functionID)][i];
+    if (address < 0) {
+        printf("\tpush\tfp[%d]\n", address);
     } else {
-        printf("\tpush\t%d\n", subscriptions.back()->getValue());
+        printf("\tpush\t%d\n", address);
     }
-    for (int i = 0; i != subscriptions.size() - 1 ; ++i) {
-        printf("\tadd\n");
-    }
-    printf("\tpush\t%d\n", addressTable.second[getDefinitionScope(sList, functionID)][i]);
     printf("\tadd\n");
     printf("\tpop\tac\n");
 }
@@ -789,6 +802,9 @@ void VarNode::assign(vector<int> & sList, int functionID) const {
 }
 
 int VarNode::getDefinitionScope(const vector<int>& sList, int functionID) const {
+    if (global) {
+        return GLOBAL;
+    }
     for (auto j = sList.size() - 1; j != -1; --j) {
         if (variableTable[sList[j]].count(i) != 0) {
             return sList[j];
