@@ -15,7 +15,8 @@ using std::list;
 
 #include <array>
 using std::array;
-
+class FunctionNode;
+class CallNode;
 class Node {
 public:
     Node()=default;
@@ -71,6 +72,7 @@ public:
     ExprNode(int, const vector<shared_ptr<Node> >&);
     void ex(vector<int>&, int, int, int) const;
     void check(vector<int>&, int) const;
+    void checkArray(vector<int>&, int, const shared_ptr<Node>&) const;
     int getOper() const;
     void inStmt();
     void evaluate();
@@ -82,6 +84,8 @@ private:
     int value;
     bool known;
     array<shared_ptr<Node>, 2> op;
+friend class ::FunctionNode;
+friend class ::CallNode;
 };
 
 class StmtNode: public Node {
@@ -115,12 +119,15 @@ public:
     bool isGlobal() const;
     int getDefinitionScope(const vector<int>&, int) const;
     int getDimensions() const;
+    void match();
 private:
     bool global;
+    bool matched;
     vector<shared_ptr<ExprNode> > subscriptions;
     void getOffSet(vector<int>&, int, int, int) const;
     void pushPop(vector<int>&, int, bool) const;
     vector<int> getDimension() const;
+friend class ::ExprNode;
 };
 
 class DeclareNode: public Node {
@@ -141,6 +148,7 @@ public:
     size_t getNumParameters() const;
     void checkStmt(vector<int>&, int) const;
     void exStmt(vector<int>&, int, int, int) const;
+    void match(const vector<shared_ptr<ExprNode> >&, const vector<int>&, int) const;
 private:
     vector<shared_ptr<VarNode> > parameters;
     vector<shared_ptr<Node> > stmts;

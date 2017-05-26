@@ -90,6 +90,7 @@ const int VAR = -5;
 %type <exprList> subscriptionList argumentList argList
 %type <nodeList> stmtList declareList
 %type <declareNode> declareArr
+%type <iValue>dimensions dim
 %%
 
 
@@ -100,14 +101,22 @@ program:
                                                     exit(0);
                                                 }
         ;
+dim:
+        '[' ']'                             {$$ = 1;}
+        |dim '[' ']'                        {$$ = $1 + 1;}
+        ;
+dimensions:
+                                            {$$ = 0;}
+        | dim                               {$$ = $1;}
+        ;
 
 parList:
                                            {$$ = new vector<VarNode*>();}
         | parameterList                     {$$ = $1;}
         ;
 parameterList:
-        VARIABLE                          { $$ = new vector<VarNode*>{id($1)};}
-        | parameterList ',' VARIABLE        {$$ = $1;$$->push_back(id($3));}
+        VARIABLE dimensions                         { $$ = new vector<VarNode*>{id($1, false, new vector<ExprNode*>($2))};}
+        | parameterList ',' VARIABLE dimensions       {$$ = $1;$$->push_back(id($3, false, new vector<ExprNode*>($4)));}
         ;
 
 argList:

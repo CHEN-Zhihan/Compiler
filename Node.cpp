@@ -181,6 +181,21 @@ void ExprNode::ex(vector<int>& sList, int functionID, int blbl, int clbl) const 
     }
 }
 
+void ExprNode::checkArray(vector<int>& sList, int functionID, const shared_ptr<Node>& t) const {
+    auto e = dynamic_pointer_cast<VarNode>(t);
+    if (e == nullptr) {
+        return;
+    }
+    if (!e->matched) {
+        if (e != nullptr and e->getDimensions() != sizeMap[{e->getDefinitionScope(sList, functionID), e->getID()}].size()) {
+            cerr << "Invalid operation on array " << reverseLookup[e->getID()] << endl;
+            exit(-1);
+        }
+    }
+
+}
+
+
 void ExprNode::check(vector<int>& sList, int functionID) const {
     if (oper != '=') {
         op[0]->check(sList, functionID);
@@ -189,18 +204,10 @@ void ExprNode::check(vector<int>& sList, int functionID) const {
         dynamic_pointer_cast<VarNode>(op[0])->assign(sList, functionID);
         return;
     }
-    auto e = dynamic_pointer_cast<VarNode>(op[0]);
-    if (e != nullptr and e->getDimensions() != sizeMap[{e->getDefinitionScope(sList, functionID), e->getID()}].size()) {
-        cerr << "Invalid operation on array " << reverseLookup[e->getID()] << endl;
-        exit(-1);
-    }
+    checkArray(sList, functionID, op[0]);
     unordered_set<int> uniOp{INTEGER, STRING, CHARACTER, BOOL, VAR, UMINUS, CALL, POSINC, POSDEC, PREINC, PREDEC, CALL};
     if (uniOp.count(oper) == 0) {
-        auto e2 = dynamic_pointer_cast<VarNode>(op[1]);
-        if (e2 != nullptr and e2->getDimensions() != sizeMap[{e2->getDefinitionScope(sList, functionID), e2->getID()}].size()) {
-            cerr << "Invalid operation on array " << reverseLookup[e2->getID()] << endl;
-            exit(-1);
-        }
+        checkArray(sList, functionID, op[1]);
         op[1]->check(sList, functionID);
     }
     if (oper == POSINC or oper == POSDEC or oper == PREINC or oper == PREDEC) {
@@ -478,11 +485,28 @@ void FunctionNode::check(vector<int>& sList, int base) const {
             cerr << "add variable " << j->getID() << " to " << i << endl;
         #endif
         addressTable[i].second[i][(*j)->getID()] = - 3 + (size++) - parameters.size();
+        sizeMap[{i, (*j)->getID()}] = vector<int>((*j)->getDimensions());
     }
     #if DEBUG
         cerr << "adding function " << ID.i << " to " << GLOBAL << endl;
     #endif
     variableTable[GLOBAL].insert(i);
+}
+
+void FunctionNode::match(const vector<shared_ptr<ExprNode> >& arguments, const vector<int>& sList, int base) const {
+    for (int i = 0; i != arguments.size(); ++i) {
+        auto parameter = parameters[i];
+        auto argument = arguments[i];
+        auto dimension = sizeMap[{parameter->getDefinitionScope(sList, base), parameter->getID()}];
+        if (parameter->getDimensions() != 0) {
+            auto v = dynamic_pointer_cast<VarNode>(argument->op[0]);
+            if (argument->oper != VAR or v->getDimensions() != dimension.size()) {
+                cerr << "Invalid " << i << " th argument for function " << reverseLookup[this->i] << endl;
+                exit(-1);
+            }
+            v->match();
+        }
+    }
 }
 
 CallNode::CallNode(int i, const vector<shared_ptr<ExprNode> >& a):IDNode(i), arguments(a) {;}
@@ -491,7 +515,7 @@ void CallNode::ex(vector<int>& sList, int function, int blbl, int clbl) const {
     if (i < 3) {
         cout << "\t" << reverseLookup[i] << "\n";
     } else if (i < 9) {
-        arguments.front()->ex(sList, function, blbl, clbl);
+        arguments.back()->ex(sList, function, blbl, clbl);
         cout << "\t" << reverseLookup[i] << "\n";
     } else {
         for (const auto& i: arguments) {
@@ -526,6 +550,7 @@ void CallNode::check(vector<int> & sList, int functionID) const {
                  << " argument(s), got " << arguments.size() << endl;
             exit(-1);
         }
+        f->match(arguments, sList, functionID);
         for (const auto & i: arguments) {
             i->check(sList, functionID);
         }
@@ -699,6 +724,8 @@ void VarNode::declare(vector<int> &sList, int functionID) const {
 int VarNode::getDimensions() const {
     return subscriptions.size();
 }
+
+void VarNode::match() {matched = true;}
 
 void VarNode::assign(vector<int> & sList, int functionID) const {
     if (functionTable.count(i) != 0) {
