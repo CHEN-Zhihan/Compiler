@@ -8,11 +8,11 @@ def gg2(i, j, k) {
     @board[i][j] = k;
 }
 
-def gg(x[][], i, j, k) {
+def gg(x[][3], i, j, k) {
     x[i][j] = k;
 }
 
-def f(x[][]) {
+def f(x[][3]) {
     x[2][2] = 5;
     if (@board[2][2] == 5) {
         puts("correct!");
