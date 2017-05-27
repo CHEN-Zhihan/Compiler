@@ -87,7 +87,6 @@ int minimax(bool isComputer) {
                     board[i][j] = EMPTY;
                     if (temp > max) {
                         max = temp;
-                        move = i * 3 + j;                        
                     }
                 }
             }
@@ -101,9 +100,8 @@ int minimax(bool isComputer) {
                     board[i][j] = PLAYER;
                     temp = minimax(true);
                     board[i][j] = EMPTY;
-                    if (min < temp) {
+                    if (min > temp) {
                         min = temp;
-                        move = i * 3 + j;
                     }
                 }
             }
@@ -119,7 +117,7 @@ void set() {
         cin >> input;
         i = input / 3;
         j = input % 3;
-        if (board[i][j] != EMPTY) {
+        if (board[i][j] != EMPTY || input < 0 || input >= 9) {
             cout << "Cannot put your mark here!" << endl;
         } else {
             break;
@@ -136,6 +134,27 @@ char getChar(int i, int j) {
         return 'O';
     }
     return'X';
+}
+
+int getMove() {
+    int best = -2;
+    int index = 0;
+    for (int i = 0; i != 3; ++i) {
+        for (int j = 0; j != 3; ++j) {
+            if (board[i][j] == EMPTY) {
+                board[i][j] = COMPUTER;
+                int value = minimax(false);
+                cout << i * 3 + j << " " << value << endl;
+                board[i][j] = EMPTY;
+                if (value > best) {
+                    index = i * 3 + j;
+                    best = value;
+                    cout << index << " best " << value << endl;
+                }
+            }
+        }
+    }
+    return index;
 }
 
 void paint() {
@@ -156,7 +175,6 @@ int main(int argc, const char * argv[]) {
     paint();
     while (true) {
         set();
-        paint();
         if (canWin() == -1) {
             cout << "You win!" << endl;
             break;
@@ -165,7 +183,7 @@ int main(int argc, const char * argv[]) {
             cout << "Draw!" << endl;
             break;
         }
-        minimax(true);
+        int move = getMove();
         board[move / 3][move % 3] = COMPUTER;
         paint();
         if (canWin() == 1) {
