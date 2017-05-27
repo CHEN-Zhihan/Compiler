@@ -22,16 +22,18 @@ UID: 3035142261
 
     `a = geti();`
 
-- When a function accepts an array as a parameter, it must indicate the dimension of that array. Arrays are passed by reference. Others are passed by value;
+- When a function accepts an array as a parameter, it must indicate the dimension of that array. For multi-dimensional array, it must indicate the size of each dimension starting from the second dimension. Arrays are passed by reference. Others are passed by value. 
 
 
     ```
-    def f(x[][], i, j) {
+    def f(x[][5], i, j) {
         x[i][j] = 1;
     }
 
     array y[3][5] = 0;
+    array z[4][7] = 0;
     f(y, 1, 2);
+    // f(z, 1, 2); error
     puti(y[1][2]) // prints 1;
     // f(y[1], 2, 3); error
     // f(y[1][2], 2, 3); error
