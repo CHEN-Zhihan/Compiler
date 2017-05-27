@@ -4,6 +4,7 @@ EMPTY = 0;
 PLAYER = 1;
 COMPUTER = 2;
 array board[3][3] = EMPTY;
+move = 0;
 
 def print() {
     for (i = 0; i != 3; ++i;) {
@@ -38,7 +39,7 @@ def canWin() {
     if (@board[2][0] == @board[1][1] && @board[1][1] == @board[0][2]) {
         if (@board[2][0] == @PLAYER) {
             return -1;
-        } else if (@board[0][0] == @COMPUTER){
+        } else if (@board[2][0] == @COMPUTER){
             return 1;
         }
     }
@@ -64,17 +65,12 @@ def canWin() {
     }
     return 0;
 }
-
 def minimax(isComputer) {
-    puts("begin");
-    print();
     temp = canWin();
-    puti(temp);
     if (temp != 0) {
         return temp;
     }
     if (!hasEmpty()) {
-        puts("no empty available");
         return 0;
     }
     if (isComputer) {
@@ -83,12 +79,11 @@ def minimax(isComputer) {
             for (j = 0; j != 3; ++j;) {
                 if (@board[i][j] == @EMPTY) {
                     @board[i][j] = @COMPUTER;
-                    puts_("I am computer, putting at ");
-                    puti(i * 3 + j);
                     temp = minimax(false);
                     @board[i][j] = @EMPTY;
                     if (temp > max) {
                         max = temp;
+                        @move = i * 3 + j;
                     }
                 }
             }
@@ -100,12 +95,11 @@ def minimax(isComputer) {
             for (j = 0; j != 3; ++j;) {
                 if (@board[i][j] == @EMPTY) {
                     @board[i][j] = @PLAYER;
-                    puts_("I am player, putting at ");
-                    puti(i * 3 + j);
                     temp = minimax(true);
                     @board[i][j] = @EMPTY;
                     if (min < temp) {
                         min = temp;
+                        @move = i * 3 + j;
                     }
                 }
             }
@@ -114,4 +108,60 @@ def minimax(isComputer) {
     }
 }
 
+def set() {
+    i = j = 0; // chaining assignment;
+    while (true) {
+        input = geti();
+        i = input / 3;
+        j = input % 3;
+        if (@board[i][j] != @EMPTY) {
+            puts("Cannot put your mark here!");
+        } else {
+            break;
+        }
+    }
+    @board[i][j] = @PLAYER;
+}
+
+def getChar(i, j) {
+    if (@board[i][j] == @EMPTY) {
+        return (i * 3 + j) + '0';
+    }
+    if (@board[i][j] == @PLAYER) {
+        return 'O';
+    }
+    return 'X';
+}
+def paint() {
+    bound = "=================";
+    left = "|| ";
+    mid = " || ";
+    right = " ||";
+    puts(bound);
+    puts_(left);
+    putc_(getChar(0, 0));
+    puts_(mid);
+    putc_(getChar(0, 1));
+    puts_(mid);
+    putc_(getChar(0, 2));
+    puts(right);
+    puts(bound);
+    puts_(left);
+    putc_(getChar(1, 0));
+    puts_(mid);
+    putc_(getChar(1, 1));
+    puts_(mid);
+    putc_(getChar(1, 2));
+    puts(right);
+    puts(bound);
+    puts_(left);
+    putc_(getChar(2, 0));
+    puts_(mid);
+    putc_(getChar(2, 1));
+    puts_(mid);
+    putc_(getChar(2, 2));
+    puts(right);
+    puts(bound);
+}
 minimax(true);
+puti(move);

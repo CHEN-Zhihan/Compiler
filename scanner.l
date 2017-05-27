@@ -90,6 +90,7 @@ void yyerror(char *);
 "!"         return NOT;
 \/\/.*\n    ;    /* skip comments */
 [ \t\n]+    ;       /* ignore whitespace */
+\/\*(.|\n)*\*\/  ;
 "array "    return ARRAY;
 "def "      return DEF;
 .           yyerror(yytext);

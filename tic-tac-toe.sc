@@ -114,24 +114,6 @@ def minimax(isComputer) {
     }
 }
 
-def getMove() {
-    max = -3;
-    maxIndex = 0;
-    for (i = 0; i != 3; ++i;) {
-        for (j = 0; j != 3; ++j;) {
-            if (@board[i][j] == @EMPTY) {
-                puts("calling minimax");
-                temp = minimax(true);
-                if (temp > max) {
-                    maxIndex = i * 3 + j;
-                    max = temp;
-                }
-            }
-        }
-    }
-    return maxIndex;
-}
-
 def set(p) {
     i = j = 0; // chaining assignment;
     while (true) {
@@ -219,4 +201,3 @@ def main() {
         }
     }
 }
-minimax(true);

@@ -43,9 +43,9 @@ using ID = int;
     scopes.push_back(--scopeCounter);\
     sList.push_back(scopes.back());\
     variableTable[scopeCounter] = unordered_set<int>();\
-    addressTable.second[scopeCounter] = unordered_map<int, int>();\
+    addressTable[functionID].second[scopeCounter] = unordered_map<int, int>();\
     node->check(sList, functionID);\
-    releaseSpace(sList.back());\
+    releaseSpace(functionID, sList.back());\
     sList.pop_back();\
 
 #define EVAL(oper) value = stack[0] oper stack[1]; break;
@@ -59,39 +59,39 @@ const int VAR = -5;
 const int CALL = -3;
 extern unordered_map<int, string> operatorInstruction;
 extern unordered_map<int, int> functionLabel;
-extern pair<int, map<scope, unordered_map<ID, address> > > addressTable;
-set<pair<int, int> > reusableAddress;
+extern unordered_map<int, pair<int, unordered_map<scope, unordered_map<ID, address> > > > addressTable;
+extern unordered_map<int, set<pair<address, int> > > reusableAddress;
 map<pair<int, int>, vector<int>> sizeMap;
 extern unordered_map<int, FunctionNode* > functionTable;
 extern unordered_map<int, unordered_set<int> > variableTable;
 extern vector<string> reverseLookup;
 
-int findSpace(int targetSize) {
-    for (const auto & i : reusableAddress) {
+int findSpace(int functionID, int targetSize) {
+    for (const auto & i : reusableAddress[functionID]) {
         if (i.second == targetSize) {
             #if DEBUG
                 cerr << "found a space at " << i.first << " of size " << targetSize << endl;
             #endif
-            reusableAddress.erase(i);
+            reusableAddress[functionID].erase(i);
             return i.first;
         } else if (i.second > targetSize) {
             #if DEBUG
                 cerr << "found a space at " << i.first << " of size " << i.second << " " << i.second - targetSize << " left" << endl;
             #endif
-            reusableAddress.erase(i);
-            reusableAddress.insert({i.first + targetSize, i.second - targetSize});
+            reusableAddress[functionID].erase(i);
+            reusableAddress[functionID].insert({i.first + targetSize, i.second - targetSize});
             return i.first;
         }
     }
     return -1;
 }
 
-void releaseSpace(int scopeID) {
-    for (const auto & i : addressTable.second[scopeID]) {
+void releaseSpace(int functionID, int scopeID) {
+    for (const auto & i : addressTable[functionID].second[scopeID]) {
         auto dimension = sizeMap[{scopeID, i.first}];
         auto size = accumulate(dimension.begin(), dimension.end(), 1, multiplies<int>());
         auto p = pair<int, int>{i.second, size};
-        reusableAddress.insert(p);
+        reusableAddress[functionID].insert(p);
         #if DEBUG
             cerr << "Returning space at " << i.second << " of size " << size << endl; 
         #endif
@@ -420,12 +420,12 @@ void StmtNode::check(vector<int>& sList, int functionID) {
             scopes.push_back(--scopeCounter);
             sList.push_back(scopes[0]);
             variableTable[scopeCounter] = unordered_set<int>();
-            addressTable.second[scopeCounter] = unordered_map<int, int>();
+            addressTable[functionID].second[scopeCounter] = unordered_map<int, int>();
             op[0]->check(sList, functionID);
             op[1]->check(sList, functionID);
             op[3]->check(sList, functionID);
             op[2]->check(sList, functionID);
-            releaseSpace(sList.back());
+            releaseSpace(functionID, sList.back());
             sList.pop_back();
             break;
         } case WHILE: {
@@ -479,7 +479,7 @@ void FunctionNode::checkStmt(vector<int>& sList, int base) {
     }
 }
 
-void FunctionNode::check(vector<int>& sList, int base) {
+void FunctionNode::check(vector<int>& sList, int functionID) {
     if (sList.back() != GLOBAL) {
         cerr << "Function " << reverseLookup[i] << " can only be defined in the global scope" << endl;
         exit(-1);
@@ -489,7 +489,7 @@ void FunctionNode::check(vector<int>& sList, int base) {
         exit(-1);
     }
     variableTable[i] = unordered_set<int>();
-    addressTable.second[i] = unordered_map<int, int>();
+    addressTable[i] ={0, unordered_map<int, unordered_map<ID, address> >()};
     int size = 0;
     functionTable[i] = this;
     unordered_set<int> duplicateSet;
@@ -499,7 +499,7 @@ void FunctionNode::check(vector<int>& sList, int base) {
             exit(-1);
         }
         if (duplicateSet.count((*j)->getID()) != 0) {
-            cerr << "duplicate argument '" << reverseLookup[(*j)->getID()] << "' in function definition" << endl;
+            cerr << "duplicate parameter '" << reverseLookup[(*j)->getID()] << "' in function definition" << endl;
             exit(-1);
         }
         duplicateSet.insert((*j)->getID());
@@ -508,7 +508,7 @@ void FunctionNode::check(vector<int>& sList, int base) {
             cerr << "add variable " << reverseLookup[(*j)->getID()] << " to " << i << endl;
             cerr << "add variable of size " << (*j)->getDimensions() << " to " << i << " " << (*j)->getID() << endl;
         #endif
-        addressTable.second[i][(*j)->getID()] = - 3 + (size++) - parameters.size();
+        addressTable[i].second[i][(*j)->getID()] = - 3 + (size++) - parameters.size();
         sizeMap[{i, (*j)->getID()}] = vector<int>((*j)->getDimensions());
     }
     #if DEBUG
@@ -537,6 +537,7 @@ void FunctionNode::match(const vector<shared_ptr<ExprNode> >& arguments, const v
                 exit(-1);
             }
             v->match();
+            sizeMap[{this->i, parameter->getID()}] = dimension;
         }
     }
 }
@@ -600,15 +601,32 @@ VarNode::VarNode(int i, bool global, const vector<shared_ptr<ExprNode>>& s):IDNo
 void VarNode::pushPop(vector<int>&sList, int functionID, bool push) const {
     string instruction = push ? "push" : "pop";
     if (subscriptions.size() == 0) {
-        auto address = addressTable.second[global?GLOBAL:getDefinitionScope(sList, functionID)][i];
-        if (address >= 0) {
-            cout << "\t" << instruction << "\tsb[" << address << "]" << endl;
+        if (global) {
+            cout << "\t" << instruction << "\tsb[" <<  addressTable[GLOBAL].second[GLOBAL][i] << "]\n";
+        } else if (functionID == GLOBAL) {
+            cout << "\t" << instruction << "\tsb[" << addressTable[GLOBAL].second[getDefinitionScope(sList, GLOBAL)][i] << "]\n";
         } else {
+            auto address = addressTable[functionID].second[getDefinitionScope(sList, functionID)][i];
             cout << "\t" << instruction << "\tfp[" << address << "]" << endl;
         }
         return;
     }
     getOffSet(sList, functionID, -1, -1);
+    if (global) {
+        printf("\tpush\t%d\n", addressTable[GLOBAL].second[GLOBAL][i]);
+    } else if (functionID == GLOBAL) {
+        auto address = addressTable[GLOBAL].second[getDefinitionScope(sList, functionID)][i];
+        printf("\tpush\t%d\n", address);
+    } else {
+        auto address = addressTable[functionID].second[getDefinitionScope(sList, functionID)][i];        
+        printf("\tpush\tfp[%d]\n", address);
+        if (address >= 0) {
+            printf("\tpush\tfp\n");
+            printf("\tadd\n");
+        }
+    }
+    printf("\tadd\n");
+    printf("\tpop\tac\n");
     cout << "\t" << instruction << "\tsb[ac]\n";
 }
 
@@ -622,12 +640,21 @@ void VarNode::pop(vector<int>&sList, int functionID) const {
 
 void VarNode::ex(vector<int>& sList, int functionID, int blbl, int clbl) const {
     int definitionScope = getDefinitionScope(sList, functionID);
-    if (sizeMap[{definitionScope, i}].size() != 0 and subscriptions.size() == 0) {
-        int address = addressTable.second[definitionScope][i];
+    if (sizeMap[{definitionScope, i}].size() != 0 and subscriptions.size() == 0) { // pass by reference
+        int address = addressTable[functionID].second[definitionScope][i];
         if (address < 0) { // is parameter
             printf("\tpush\tfp[%d]\n", address);
         } else {
-            printf("\tpush\t%d\n", addressTable.second[definitionScope][i]);
+            if (global) {
+                printf("\tpush\t%d\n", addressTable[GLOBAL].second[GLOBAL][i]);
+            } else if (functionID == GLOBAL) {
+                auto address = addressTable[GLOBAL].second[getDefinitionScope(sList, functionID)][i];
+                printf("\tpush\t%d\n", address);
+            } else {
+                printf("\tpush\t%d\n", addressTable[functionID].second[definitionScope][i]);
+                printf("\tpush\tfp\n");
+                printf("\tadd\n");
+            }
         }
     } else {
         push(sList, functionID);
@@ -684,14 +711,6 @@ void VarNode::getOffSet(vector<int>& sList, int functionID, int blbl, int clbl) 
             printf("\tadd\n");
         }
     }
-    auto address = addressTable.second[getDefinitionScope(sList, functionID)][i];
-    if (address < 0) {
-        printf("\tpush\tfp[%d]\n", address);
-    } else {
-        printf("\tpush\t%d\n", address);
-    }
-    printf("\tadd\n");
-    printf("\tpop\tac\n");
 }
 
 vector<int> VarNode::getDimension() const {
@@ -730,12 +749,12 @@ void VarNode::declare(vector<int> &sList, int functionID) const {
             cerr << "Redeclaration of variable " << reverseLookup[i] << endl;
             exit(-1);
         }
-        auto address = findSpace(size);
+        auto address = findSpace(functionID, size);
         if (address == -1) {
-            addressTable.second[GLOBAL][i] = addressTable.first;
-            addressTable.first += size;
+            addressTable[GLOBAL].second[GLOBAL][i] = addressTable[GLOBAL].first;
+            addressTable[GLOBAL].first += size;
         } else {
-            addressTable.second[GLOBAL][i] = address;
+            addressTable[GLOBAL].second[GLOBAL][i] = address;
         }
         variableTable[GLOBAL].insert(i);
         sizeMap[{GLOBAL, i}] = dimension;
@@ -749,12 +768,12 @@ void VarNode::declare(vector<int> &sList, int functionID) const {
         #if DEBUG
             cerr << "add variable " << i << " to " << sList.back() << endl;
         #endif
-        auto address = findSpace(size);
+        auto address = findSpace(functionID, size);
         if (address == -1) {
-            addressTable.second[sList.back()][i] = addressTable.first;
-            addressTable.first += size;
+            addressTable[functionID].second[sList.back()][i] = addressTable[functionID].first;
+            addressTable[functionID].first += size;
         } else {
-            addressTable.second[sList.back()][i] = address;
+            addressTable[functionID].second[sList.back()][i] = address;
         }
         sizeMap[{sList.back(), i}] = dimension;
     }
@@ -790,7 +809,7 @@ void VarNode::assign(vector<int> & sList, int functionID) const {
                 exit(-1);
             }
             variableTable[GLOBAL].insert(i);
-            addressTable.second[GLOBAL][i] = addressTable.first++;
+            addressTable[GLOBAL].second[GLOBAL][i] = addressTable[GLOBAL].first++;
             sizeMap[{GLOBAL, i}] = vector<int>();
         }
     } else {
@@ -804,11 +823,11 @@ void VarNode::assign(vector<int> & sList, int functionID) const {
                 cerr << "Invalid assignment to array " << reverseLookup[i] << endl;
                 exit(-1);
             }
-            auto address = findSpace(1);
+            auto address = findSpace(functionID, 1);
             if (address == -1) {
-                addressTable.second[sList.back()][i] = addressTable.first++;
+                addressTable[functionID].second[sList.back()][i] = addressTable[functionID].first++;
             } else {
-                addressTable.second[sList.back()][i] = address;
+                addressTable[functionID].second[sList.back()][i] = address;
             }
             variableTable[sList.back()].insert(i);
             #if DEBUG
@@ -859,14 +878,14 @@ void VarNode::check(vector<int>& sList, int functionID) {
 }
 
 DeclareNode::DeclareNode(const shared_ptr<VarNode>& v, const shared_ptr<ExprNode> e):variable(v), initializer(e) {;}
-void DeclareNode::ex(vector<int>& sList, int function, int blbl, int clbl) const {
+void DeclareNode::ex(vector<int>& sList, int functionID, int blbl, int clbl) const {
     if (initializer != nullptr) {
         auto dimension = sizeMap[{sList.back(), variable->getID()}];
-        int address = addressTable.second[variable->getDefinitionScope(sList, function)][variable->getID()];        
+        int address = addressTable[functionID].second[variable->getDefinitionScope(sList, functionID)][variable->getID()];        
         int size = accumulate(dimension.begin(), dimension.end(), 1, multiplies<int>());
-        string base =(variable->isGlobal() or function == GLOBAL) ? "sb" : "fp";
+        string base =(variable->isGlobal() or functionID == GLOBAL) ? "sb" : "fp";
         for (int i = 0; i != size; ++i) {
-            initializer->ex(sList, function, blbl, clbl);
+            initializer->ex(sList, functionID, blbl, clbl);
             cout << "\tpop\t" << base << "[" << address + i << "]\n";
         }
     }

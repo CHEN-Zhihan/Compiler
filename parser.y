@@ -188,14 +188,14 @@ expr:
         | variable DEC             { $$ = expr(POSDEC, {$1});}
         | INC variable             { $$ = expr(PREINC, {$2});}
         | DEC variable             { $$ = expr(PREDEC, {$2});}
-        | expr GE expr          { $$ = expr(GE, {$1, $3});}
-        | expr LE expr          { $$ = expr(LE, {$1, $3});}
-        | expr NE expr          { $$ = expr(NE, {$1, $3});}
-        | expr EQ expr          { $$ = expr(EQ, {$1, $3});}
-        | expr AND expr            { $$ = expr(AND, {$1, $3});}
-        | expr OR expr            { $$ = expr(OR, {$1, $3});}
+        | expr GE expr          {$$ = expr(GE, {$1, $3});}
+        | expr LE expr          {$$ = expr(LE, {$1, $3});}
+        | expr NE expr          {$$ = expr(NE, {$1, $3});}
+        | expr EQ expr          {$$ = expr(EQ, {$1, $3});}
+        | expr AND expr            {$$ = expr(AND, {$1, $3});}
+        | expr OR expr            {$$ = expr(OR, {$1, $3});}
         | NOT expr            {$$ = expr(NOT, {$2});}
-        | '(' expr ')'          { $$ = $2;}
+        | '(' expr ')'          {$$ = $2;}
         | VARIABLE '(' argList ')' {$$ = expr(CALL, {call($1, $3)});}
         ;
 %%
