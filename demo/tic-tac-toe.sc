@@ -108,7 +108,7 @@ def minimax(isComputer) {
     }
 }
 
-def set(x[][]) { // passing array into function requires subscription operator to indicate dimension.
+def set(x[][3]) { // passing array into function requires subscription operator to indicate dimension.
     i = j = 0; // chained assignment;
     while (true) {
         puts_("Enter your input: ");
