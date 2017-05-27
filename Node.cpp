@@ -536,6 +536,13 @@ void FunctionNode::match(const vector<shared_ptr<ExprNode> >& arguments, const v
                 cerr << "Invalid " << i << " th argument for function " << reverseLookup[this->i] << endl;
                 exit(-1);
             }
+            auto pDimension = parameter->getDimension();
+            for (auto j = 1; j != pDimension.size(); ++j) {
+                if (pDimension[j] != dimension[j]) {
+                    cerr << "Invalid " << i << " th argument for function, dimension not match" << endl;
+                    exit(-1);
+                }
+            }
             v->match();
             sizeMap[{this->i, parameter->getID()}] = dimension;
         }
@@ -719,12 +726,15 @@ vector<int> VarNode::getDimension() const {
     }
     auto result = vector<int>(subscriptions.size());
     transform(subscriptions.begin(), subscriptions.end(), result.begin(), [this] (shared_ptr<ExprNode> node) -> int {
-        node->evaluate();
-        if (!node->isKnown()) {
-            cerr << "Invalid size of array " << reverseLookup[i] << endl;
-            exit(-1);
+        if (node != nullptr) {
+            node->evaluate();
+            if (!node->isKnown()) {
+                cerr << "Invalid size of array " << reverseLookup[i] << endl;
+                exit(-1);
+            }
+            return node->getValue();
         }
-        return node->getValue();
+        return 0;
     });
     return result;
 }

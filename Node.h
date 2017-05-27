@@ -132,6 +132,7 @@ private:
     void pushPop(vector<int>&, int, bool) const;
     vector<int> getDimension() const;
 friend class ::ExprNode;
+friend class ::FunctionNode;
 };
 
 class DeclareNode: public Node {
